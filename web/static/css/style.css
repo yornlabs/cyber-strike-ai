@@ -10915,6 +10915,75 @@ header {
     flex-shrink: 0;
 }
 
+.agent-mode-wrapper {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* 与角色选择器共用 .role-selector-btn；此处仅包一层用于定位浮层 */
+.agent-mode-inner {
+    position: relative;
+    flex-shrink: 0;
+}
+
+/* 单/多代理面板：与「选择角色」浮层同一视觉语言（白底、圆角、阴影） */
+.agent-mode-panel {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 0;
+    width: 300px;
+    max-width: calc(100vw - 32px);
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 4px 16px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    backdrop-filter: blur(20px);
+    text-align: left;
+}
+
+.agent-mode-panel-header {
+    margin-bottom: 8px;
+    text-align: left;
+}
+
+.agent-mode-panel .role-selection-panel-title {
+    text-align: left;
+}
+
+.agent-mode-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+/* 选项为 <button>，浏览器默认 text-align:center 会继承到文案，强制左对齐与角色列表一致 */
+.agent-mode-option.role-selection-item-main {
+    text-align: left;
+    justify-content: flex-start;
+}
+
+.agent-mode-option .role-selection-item-content-main,
+.agent-mode-option .role-selection-item-name-main,
+.agent-mode-option .role-selection-item-description-main {
+    text-align: left;
+}
+
+
+/* 选项内勾选：未选中时隐藏（与角色列表一致） */
+.agent-mode-option .agent-mode-check {
+    display: none !important;
+}
+
+.agent-mode-option.selected .agent-mode-check {
+    display: flex !important;
+}
+
 /* 主内容区域角色选择面板样式（下拉菜单形式） */
 .role-selection-panel {
     position: absolute;
@@ -11933,7 +12002,8 @@ header {
 
 /* 角色选择面板响应式样式 */
 @media (max-width: 768px) {
-    .role-selection-panel {
+    .role-selection-panel,
+    .agent-mode-panel {
         width: calc(100vw - 16px);
         max-width: calc(100vw - 16px);
         left: -8px;
@@ -11978,7 +12048,8 @@ header {
 }
 
 @media (max-width: 480px) {
-    .role-selection-panel {
+    .role-selection-panel,
+    .agent-mode-panel {
         width: calc(100vw - 8px);
         max-width: calc(100vw - 8px);
         left: -4px;
@@ -12225,6 +12296,21 @@ header {
     color: var(--text-primary);
 }
 
+.agents-page-hint {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    line-height: 1.55;
+    margin: 0 0 12px 0;
+    max-width: 960px;
+}
+
+.agents-dir-label {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    word-break: break-all;
+}
+
 /* 技能列表布局 */
 .skills-grid {
     display: flex;
@@ -12276,6 +12362,38 @@ header {
     line-height: 1.4;
     word-break: break-word;
     overflow-wrap: break-word;
+}
+
+.agent-role-badge {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 8px;
+    vertical-align: middle;
+}
+
+.agent-role-badge--orchestrator {
+    background: rgba(0, 102, 255, 0.12);
+    color: var(--accent-color, #0066ff);
+}
+
+.agent-role-badge--sub {
+    background: var(--bg-tertiary, rgba(0, 0, 0, 0.06));
+    color: var(--text-secondary);
+}
+
+#agent-md-modal .form-select {
+    width: 100%;
+    max-width: 100%;
+    padding: 8px 12px;
+    font-size: 0.9375rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
 }
 
 .skill-card-description {

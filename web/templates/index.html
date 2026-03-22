@@ -220,6 +220,24 @@
                             </div>
                         </div>
                     </div>
+                    <div class="nav-item nav-item-has-submenu" data-page="agents">
+                        <div class="nav-item-content" data-title="Agents" onclick="toggleSubmenu('agents')" data-i18n="nav.agents" data-i18n-attr="data-title" data-i18n-skip-text="true">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                <polyline points="2 17 12 22 22 17"></polyline>
+                                <polyline points="2 12 12 17 22 12"></polyline>
+                            </svg>
+                            <span data-i18n="nav.agents">Agents</span>
+                            <svg class="submenu-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="nav-submenu">
+                            <div class="nav-submenu-item" data-page="agents-management" onclick="switchPage('agents-management')">
+                                <span data-i18n="nav.agentsManagement">Agent管理</span>
+                            </div>
+                        </div>
+                    </div>
                     <div class="nav-item nav-item-has-submenu" data-page="roles">
                         <div class="nav-item-content" data-title="角色" onclick="toggleSubmenu('roles')" data-i18n="nav.roles" data-i18n-attr="data-title" data-i18n-skip-text="true">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -565,6 +583,46 @@
                                         </div>
                                         <div id="role-selection-list" class="role-selection-list-main"></div>
                                     </div>
+                                </div>
+                                <div id="agent-mode-wrapper" class="agent-mode-wrapper" style="display: none;">
+                                    <div class="agent-mode-inner">
+                                        <button type="button" id="agent-mode-btn" class="role-selector-btn agent-mode-btn" onclick="toggleAgentModePanel()" data-i18n="chat.agentModeSelectAria" data-i18n-attr="aria-label,title" data-i18n-skip-text="true" aria-label="选择单代理或多代理" aria-haspopup="listbox" aria-expanded="false" title="选择单代理或多代理">
+                                            <span id="agent-mode-icon" class="role-selector-icon" aria-hidden="true">🤖</span>
+                                            <span id="agent-mode-text" class="role-selector-text">单代理</span>
+                                            <svg class="role-selector-arrow" width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                            </svg>
+                                        </button>
+                                        <div id="agent-mode-panel" class="agent-mode-panel" style="display: none;" role="listbox" aria-labelledby="agent-mode-panel-title">
+                                            <div class="role-selection-panel-header agent-mode-panel-header">
+                                                <h3 id="agent-mode-panel-title" class="role-selection-panel-title" data-i18n="chat.agentModePanelTitle">对话模式</h3>
+                                                <button type="button" class="role-selection-panel-close" onclick="closeAgentModePanel()" data-i18n="common.close" data-i18n-attr="title" title="关闭">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div class="agent-mode-options">
+                                                <button type="button" class="role-selection-item-main agent-mode-option" data-value="single" role="option" onclick="selectAgentMode('single')">
+                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🤖</div>
+                                                    <div class="role-selection-item-content-main">
+                                                        <div class="role-selection-item-name-main" data-i18n="chat.agentModeSingle">单代理</div>
+                                                        <div class="role-selection-item-description-main" data-i18n="chat.agentModeSingleHint">单模型 ReAct 循环，适合常规对话与工具调用</div>
+                                                    </div>
+                                                    <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="single">✓</div>
+                                                </button>
+                                                <button type="button" class="role-selection-item-main agent-mode-option" data-value="multi" role="option" onclick="selectAgentMode('multi')">
+                                                    <div class="role-selection-item-icon-main" aria-hidden="true">🧩</div>
+                                                    <div class="role-selection-item-content-main">
+                                                        <div class="role-selection-item-name-main" data-i18n="chat.agentModeMulti">多代理</div>
+                                                        <div class="role-selection-item-description-main" data-i18n="chat.agentModeMultiHint">Eino DeepAgent 编排子代理，适合复杂任务</div>
+                                                    </div>
+                                                    <div class="role-selection-checkmark-main agent-mode-check" data-agent-mode-check="multi">✓</div>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" id="agent-mode-select" value="single" autocomplete="off">
                                 </div>
                                 <div class="chat-input-with-files">
                                     <div id="chat-file-list" class="chat-file-list" aria-label="已选文件列表"></div>
@@ -1176,6 +1234,81 @@
                     </div>
                 </div>
 
+                <!-- 多代理子 Agent（Markdown）管理 -->
+                <div id="page-agents-management" class="page">
+                    <div class="page-header">
+                        <h2 data-i18n="agentsPage.title">Agent 管理</h2>
+                        <div class="page-header-actions">
+                            <button type="button" class="btn-secondary" onclick="loadMarkdownAgents()" data-i18n="common.refresh">刷新</button>
+                            <button type="button" class="btn-primary" onclick="showAddMarkdownAgentModal()" data-i18n="agentsPage.create">新建 Agent</button>
+                        </div>
+                    </div>
+                    <div class="page-content">
+                        <p class="agents-page-hint" data-i18n="agentsPage.hint">子 Agent 仅在 agents 目录下 .md 维护。</p>
+                        <div id="agents-md-dir" class="agents-dir-label"></div>
+                        <div id="agents-md-list" class="skills-grid">
+                            <div class="loading-spinner" data-i18n="agentsPage.loading">加载中...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Agent Markdown 编辑弹窗 -->
+                <div id="agent-md-modal" class="modal" style="display: none;">
+                    <div class="modal-content" style="max-width: 720px; max-height: 92vh;">
+                        <div class="modal-header">
+                            <h2 id="agent-md-modal-title" data-i18n="agentsPage.editTitle">编辑 Agent</h2>
+                            <span class="modal-close" onclick="closeMarkdownAgentModal()">&times;</span>
+                        </div>
+                        <div class="modal-body" style="overflow-y: auto; max-height: calc(92vh - 130px);">
+                            <input type="hidden" id="agent-md-filename-current" value="">
+                            <div class="form-group" id="agent-md-filename-row">
+                                <label data-i18n="agentsPage.filename">文件名（.md）</label>
+                                <input type="text" id="agent-md-filename" data-i18n="agentsPage.filenamePlaceholder" data-i18n-attr="placeholder" placeholder="例如 code-reviewer.md" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldRole">类型</label>
+                                <select id="agent-md-role" class="form-select">
+                                    <option value="sub" data-i18n="agentsPage.roleSub">子代理</option>
+                                    <option value="orchestrator" data-i18n="agentsPage.roleOrchestrator">主代理（Deep 协调者）</option>
+                                </select>
+                                <p class="form-hint muted" data-i18n="agentsPage.roleHint">主代理也可使用固定文件名 orchestrator.md；全目录仅允许一个主代理。</p>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldId">Agent ID（留空则从名称生成）</label>
+                                <input type="text" id="agent-md-id" placeholder="code-reviewer" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldName">显示名称</label>
+                                <input type="text" id="agent-md-name" data-i18n="agentsPage.namePlaceholder" data-i18n-attr="placeholder" placeholder="Code Reviewer" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldDesc">描述</label>
+                                <textarea id="agent-md-description" rows="2" data-i18n="agentsPage.descPlaceholder" data-i18n-attr="placeholder" placeholder="何时调用该子代理"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldTools">可用工具（逗号分隔，与角色工具 key 一致）</label>
+                                <input type="text" id="agent-md-tools" placeholder="tool_a, tool_b" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldBindRole">绑定角色（可选）</label>
+                                <input type="text" id="agent-md-bind-role" placeholder="" autocomplete="off" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldMaxIter">子代理最大迭代（0=使用全局默认）</label>
+                                <input type="number" id="agent-md-max-iter" min="0" value="0" />
+                            </div>
+                            <div class="form-group">
+                                <label data-i18n="agentsPage.fieldInstruction">系统提示词（Markdown 正文）</label>
+                                <textarea id="agent-md-instruction" rows="14" data-i18n="agentsPage.instructionPlaceholder" data-i18n-attr="placeholder" placeholder="You are a specialist agent..."></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="closeMarkdownAgentModal()" data-i18n="common.cancel">取消</button>
+                            <button type="button" class="btn-primary" onclick="saveMarkdownAgent()" data-i18n="common.save">保存</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 系统设置页面 -->
                 <div id="page-settings" class="page">
                     <div class="page-header">
@@ -1258,6 +1391,37 @@
                                         <div class="form-group">
                                             <label for="agent-max-iterations" data-i18n="settingsBasic.maxIterations">最大迭代次数</label>
                                             <input type="number" id="agent-max-iterations" min="1" max="100" data-i18n="settingsBasic.iterationsPlaceholder" data-i18n-attr="placeholder" placeholder="30" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="multi-agent-enabled" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text">启用 Eino 多代理（DeepAgent）</span>
+                                            </label>
+                                            <small class="form-hint">开启后对话页可选「多代理」模式；子代理在 config.yaml 的 multi_agent.sub_agents 中配置。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="multi-agent-default-mode">对话页默认模式</label>
+                                            <select id="multi-agent-default-mode">
+                                                <option value="single">单代理（ReAct）</option>
+                                                <option value="multi">多代理（Eino）</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="multi-agent-robot-use" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text">企业微信 / 钉钉 / 飞书机器人也使用多代理</span>
+                                            </label>
+                                            <small class="form-hint">需同时勾选「启用多代理」；调用量与成本更高。</small>
+                                        </div>
+                                        <div class="form-group">
+                                            <label class="checkbox-label">
+                                                <input type="checkbox" id="multi-agent-batch-use" class="modern-checkbox" />
+                                                <span class="checkbox-custom"></span>
+                                                <span class="checkbox-text">批量任务队列也使用多代理</span>
+                                            </label>
+                                            <small class="form-hint">开启后，任务管理中按队列执行的每个子任务将走 Eino DeepAgent（需启用多代理）。</small>
                                         </div>
                                     </div>
                                 </div>
@@ -2442,6 +2606,7 @@ version: 1.0.0<br>
     <script src="/static/js/auth.js"></script>
     <script src="/static/js/info-collect.js"></script>
     <script src="/static/js/router.js"></script>
+    <script src="/static/js/agents.js"></script>
     <script src="/static/js/dashboard.js"></script>
     <script src="/static/js/monitor.js"></script>
     <script src="/static/js/chat.js"></script>

@@ -28,6 +28,108 @@ const CHAT_FILE_DEFAULT_PROMPT = '请根据上传的文件内容进行分析。'
 /** @type {{ fileName: string, content: string, mimeType: string }[]} */
 let chatAttachments = [];
 
+// 多代理（Eino）：需后端 multi_agent.enabled，与单代理 /agent-loop 并存
+const AGENT_MODE_STORAGE_KEY = 'cyberstrike-chat-agent-mode';
+let multiAgentAPIEnabled = false;
+
+function getAgentModeLabelForValue(mode) {
+    if (typeof window.t === 'function') {
+        return mode === 'multi' ? window.t('chat.agentModeMulti') : window.t('chat.agentModeSingle');
+    }
+    return mode === 'multi' ? '多代理' : '单代理';
+}
+
+function getAgentModeIconForValue(mode) {
+    return mode === 'multi' ? '🧩' : '🤖';
+}
+
+function syncAgentModeFromValue(value) {
+    const hid = document.getElementById('agent-mode-select');
+    const label = document.getElementById('agent-mode-text');
+    const icon = document.getElementById('agent-mode-icon');
+    if (hid) hid.value = value;
+    if (label) label.textContent = getAgentModeLabelForValue(value);
+    if (icon) icon.textContent = getAgentModeIconForValue(value);
+    document.querySelectorAll('.agent-mode-option').forEach(function (el) {
+        const v = el.getAttribute('data-value');
+        el.classList.toggle('selected', v === value);
+    });
+}
+
+function closeAgentModePanel() {
+    const panel = document.getElementById('agent-mode-panel');
+    const btn = document.getElementById('agent-mode-btn');
+    if (panel) panel.style.display = 'none';
+    if (btn) {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-expanded', 'false');
+    }
+}
+
+function toggleAgentModePanel() {
+    const panel = document.getElementById('agent-mode-panel');
+    const btn = document.getElementById('agent-mode-btn');
+    if (!panel || !btn) return;
+    const isOpen = panel.style.display === 'flex';
+    if (isOpen) {
+        closeAgentModePanel();
+        return;
+    }
+    if (typeof closeRoleSelectionPanel === 'function') {
+        closeRoleSelectionPanel();
+    }
+    panel.style.display = 'flex';
+    btn.classList.add('active');
+    btn.setAttribute('aria-expanded', 'true');
+}
+
+function selectAgentMode(mode) {
+    if (mode !== 'single' && mode !== 'multi') return;
+    try {
+        localStorage.setItem(AGENT_MODE_STORAGE_KEY, mode);
+    } catch (e) { /* ignore */ }
+    syncAgentModeFromValue(mode);
+    closeAgentModePanel();
+}
+
+async function initChatAgentModeFromConfig() {
+    try {
+        const r = await apiFetch('/api/config');
+        if (!r.ok) return;
+        const cfg = await r.json();
+        multiAgentAPIEnabled = !!(cfg.multi_agent && cfg.multi_agent.enabled);
+        if (typeof window !== 'undefined') {
+            window.__csaiMultiAgentPublic = cfg.multi_agent || null;
+        }
+        const wrap = document.getElementById('agent-mode-wrapper');
+        const sel = document.getElementById('agent-mode-select');
+        if (!wrap || !sel) return;
+        if (!multiAgentAPIEnabled) {
+            wrap.style.display = 'none';
+            return;
+        }
+        wrap.style.display = '';
+        const def = (cfg.multi_agent && cfg.multi_agent.default_mode === 'multi') ? 'multi' : 'single';
+        let stored = localStorage.getItem(AGENT_MODE_STORAGE_KEY);
+        if (stored !== 'single' && stored !== 'multi') {
+            stored = def;
+        }
+        sel.value = stored;
+        syncAgentModeFromValue(stored);
+    } catch (e) {
+        console.warn('initChatAgentModeFromConfig', e);
+    }
+}
+
+document.addEventListener('languagechange', function () {
+    const hid = document.getElementById('agent-mode-select');
+    if (!hid) return;
+    const v = hid.value;
+    if (v === 'single' || v === 'multi') {
+        syncAgentModeFromValue(v);
+    }
+});
+
 // 保存输入框草稿到localStorage（防抖版本）
 function saveChatDraftDebounced(content) {
     // 清除之前的定时器
@@ -191,7 +293,10 @@ async function sendMessage() {
     let mcpExecutionIds = [];
     
     try {
-        const response = await apiFetch('/api/agent-loop/stream', {
+        const modeSel = document.getElementById('agent-mode-select');
+        const useMulti = multiAgentAPIEnabled && modeSel && modeSel.value === 'multi';
+        const streamPath = useMulti ? '/api/multi-agent/stream' : '/api/agent-loop/stream';
+        const response = await apiFetch(streamPath, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1249,8 +1354,8 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
     } catch (e) { /* ignore */ }
     contentWrapper.appendChild(timeDiv);
     
-    // 如果有MCP执行ID或进度ID，添加查看详情区域（统一使用"渗透测试详情"样式）
-    if (role === 'assistant' && ((mcpExecutionIds && Array.isArray(mcpExecutionIds) && mcpExecutionIds.length > 0) || progressId)) {
+    // 有 MCP 执行记录且非流式占位消息时展示调用按钮；带 progressId 的流式占位不挂此条（与进度卡片一致，结束时 integrate 再创建）
+    if (role === 'assistant' && (mcpExecutionIds && Array.isArray(mcpExecutionIds) && mcpExecutionIds.length > 0) && !progressId) {
         const mcpSection = document.createElement('div');
         mcpSection.className = 'mcp-call-section';
         
@@ -1262,29 +1367,14 @@ function addMessage(role, content, mcpExecutionIds = null, progressId = null, cr
         const buttonsContainer = document.createElement('div');
         buttonsContainer.className = 'mcp-call-buttons';
         
-        // 如果有MCP执行ID，添加MCP调用详情按钮
-        if (mcpExecutionIds && Array.isArray(mcpExecutionIds) && mcpExecutionIds.length > 0) {
-            mcpExecutionIds.forEach((execId, index) => {
-                const detailBtn = document.createElement('button');
-                detailBtn.className = 'mcp-detail-btn';
-                detailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.callNumber', { n: index + 1 }) : '调用 #' + (index + 1)) + '</span>';
-                detailBtn.onclick = () => showMCPDetail(execId);
-                buttonsContainer.appendChild(detailBtn);
-                // 异步获取工具名称并更新按钮文本
-                updateButtonWithToolName(detailBtn, execId, index + 1);
-            });
-        }
-        
-        // 如果有进度ID，添加展开详情按钮（统一使用"展开详情"文本）
-        if (progressId) {
-            const progressDetailBtn = document.createElement('button');
-            progressDetailBtn.className = 'mcp-detail-btn process-detail-btn';
-            progressDetailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情') + '</span>';
-            progressDetailBtn.onclick = () => toggleProcessDetails(progressId, messageDiv.id);
-            buttonsContainer.appendChild(progressDetailBtn);
-            // 存储进度ID到消息元素
-            messageDiv.dataset.progressId = progressId;
-        }
+        mcpExecutionIds.forEach((execId, index) => {
+            const detailBtn = document.createElement('button');
+            detailBtn.className = 'mcp-detail-btn';
+            detailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.callNumber', { n: index + 1 }) : '调用 #' + (index + 1)) + '</span>';
+            detailBtn.onclick = () => showMCPDetail(execId);
+            buttonsContainer.appendChild(detailBtn);
+            updateButtonWithToolName(detailBtn, execId, index + 1);
+        });
         
         mcpSection.appendChild(buttonsContainer);
         contentWrapper.appendChild(mcpSection);
@@ -1461,34 +1551,44 @@ function renderProcessDetails(messageId, processDetails) {
     timeline.innerHTML = '';
     
     
+    function processDetailAgentPrefix(d) {
+        if (!d || d.einoAgent == null) return '';
+        const s = String(d.einoAgent).trim();
+        return s ? ('[' + s + '] ') : '';
+    }
+
     // 渲染每个过程详情事件
     processDetails.forEach(detail => {
         const eventType = detail.eventType || '';
         const title = detail.message || '';
         const data = detail.data || {};
+        const agPx = processDetailAgentPrefix(data);
         
         // 根据事件类型渲染不同的内容
         let itemTitle = title;
         if (eventType === 'iteration') {
-            itemTitle = (typeof window.t === 'function' ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : '第 ' + (data.iteration || 1) + ' 轮迭代');
+            itemTitle = agPx + (typeof window.t === 'function' ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : '第 ' + (data.iteration || 1) + ' 轮迭代');
         } else if (eventType === 'thinking') {
-            itemTitle = '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考');
+            itemTitle = agPx + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考');
         } else if (eventType === 'tool_calls_detected') {
-            itemTitle = '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : '检测到 ' + (data.count || 0) + ' 个工具调用');
+            itemTitle = agPx + '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : '检测到 ' + (data.count || 0) + ' 个工具调用');
         } else if (eventType === 'tool_call') {
             const toolName = data.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
             const index = data.index || 0;
             const total = data.total || 0;
-            itemTitle = '🔧 ' + (typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtml(toolName), index: index, total: total }) : '调用工具: ' + escapeHtml(toolName) + ' (' + index + '/' + total + ')');
+            itemTitle = agPx + '🔧 ' + (typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtml(toolName), index: index, total: total }) : '调用工具: ' + escapeHtml(toolName) + ' (' + index + '/' + total + ')');
         } else if (eventType === 'tool_result') {
             const toolName = data.toolName || (typeof window.t === 'function' ? window.t('chat.unknownTool') : '未知工具');
             const success = data.success !== false;
             const statusIcon = success ? '✅' : '❌';
             const execText = success ? (typeof window.t === 'function' ? window.t('chat.toolExecComplete', { name: escapeHtml(toolName) }) : '工具 ' + escapeHtml(toolName) + ' 执行完成') : (typeof window.t === 'function' ? window.t('chat.toolExecFailed', { name: escapeHtml(toolName) }) : '工具 ' + escapeHtml(toolName) + ' 执行失败');
-            itemTitle = statusIcon + ' ' + execText;
+            let execLine = statusIcon + ' ' + execText;
             if (toolName === BuiltinTools.SEARCH_KNOWLEDGE_BASE && success) {
-                itemTitle = '📚 ' + itemTitle + ' - ' + (typeof window.t === 'function' ? window.t('chat.knowledgeRetrievalTag') : '知识检索');
+                execLine = '📚 ' + execLine + ' - ' + (typeof window.t === 'function' ? window.t('chat.knowledgeRetrievalTag') : '知识检索');
             }
+            itemTitle = agPx + execLine;
+        } else if (eventType === 'eino_agent_reply') {
+            itemTitle = agPx + '💬 ' + (typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复');
         } else if (eventType === 'knowledge_retrieval') {
             itemTitle = '📚 ' + (typeof window.t === 'function' ? window.t('chat.knowledgeRetrieval') : '知识检索');
         } else if (eventType === 'error') {
@@ -5497,9 +5597,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    initChatAgentModeFromConfig();
 });
 
-// 点击外部关闭图标选择器
+// 点击外部关闭图标选择器、对话模式面板
 document.addEventListener('click', function(event) {
     const picker = document.getElementById('group-icon-picker');
     const iconBtn = document.getElementById('create-group-icon-btn');
@@ -5507,6 +5608,14 @@ document.addEventListener('click', function(event) {
         // 如果点击的不是图标按钮和选择器本身，则关闭选择器
         if (!picker.contains(event.target) && !iconBtn.contains(event.target)) {
             picker.style.display = 'none';
+        }
+    }
+
+    const agentWrap = document.getElementById('agent-mode-wrapper');
+    const agentPanel = document.getElementById('agent-mode-panel');
+    if (agentWrap && agentPanel && agentPanel.style.display === 'flex') {
+        if (!agentWrap.contains(event.target)) {
+            closeAgentModePanel();
         }
     }
 });

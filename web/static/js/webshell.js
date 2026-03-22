@@ -26,6 +26,26 @@ let webshellAiSending = false;
 // 流式打字机效果：当前会话的 response 序号，用于中止过期的打字
 let webshellStreamingTypingId = 0;
 
+/** 与主对话页一致：multi_agent.enabled 且本地模式为 multi 时使用 /api/multi-agent/stream */
+function resolveWebshellAiStreamPath() {
+    if (typeof apiFetch === 'undefined') {
+        return Promise.resolve('/api/agent-loop/stream');
+    }
+    return apiFetch('/api/config').then(function (r) {
+        if (!r.ok) return '/api/agent-loop/stream';
+        return r.json();
+    }).then(function (cfg) {
+        if (!cfg || !cfg.multi_agent || !cfg.multi_agent.enabled) return '/api/agent-loop/stream';
+        var mode = localStorage.getItem('cyberstrike-chat-agent-mode');
+        if (mode !== 'single' && mode !== 'multi') {
+            mode = (cfg.multi_agent.default_mode === 'multi') ? 'multi' : 'single';
+        }
+        return mode === 'multi' ? '/api/multi-agent/stream' : '/api/agent-loop/stream';
+    }).catch(function () {
+        return '/api/agent-loop/stream';
+    });
+}
+
 // 从服务端（SQLite）拉取连接列表
 function getWebshellConnections() {
     if (typeof apiFetch === 'undefined') {
@@ -316,33 +336,52 @@ function formatWebshellAiConvDate(updatedAt) {
     return (d.getMonth() + 1) + '/' + d.getDate();
 }
 
+function webshellAgentPx(data) {
+    if (!data || data.einoAgent == null) return '';
+    var s = String(data.einoAgent).trim();
+    return s ? ('[' + s + '] ') : '';
+}
+
 // 根据后端保存的 processDetail 构建一条时间线项的 HTML（与 appendTimelineItem 展示一致）
 function buildWebshellTimelineItemFromDetail(detail) {
     var eventType = detail.eventType || '';
     var title = detail.message || '';
     var data = detail.data || {};
+    var ap = webshellAgentPx(data);
     if (eventType === 'iteration') {
-        title = (typeof window.t === 'function') ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : ('第 ' + (data.iteration || 1) + ' 轮迭代');
+        title = ap + ((typeof window.t === 'function') ? window.t('chat.iterationRound', { n: data.iteration || 1 }) : ('第 ' + (data.iteration || 1) + ' 轮迭代'));
     } else if (eventType === 'thinking') {
-        title = '🤔 ' + ((typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考');
+        title = ap + '🤔 ' + ((typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考');
     } else if (eventType === 'tool_calls_detected') {
-        title = '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : ('检测到 ' + (data.count || 0) + ' 个工具调用'));
+        title = ap + '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.toolCallsDetected', { count: data.count || 0 }) : ('检测到 ' + (data.count || 0) + ' 个工具调用'));
     } else if (eventType === 'tool_call') {
         var tn = data.toolName || ((typeof window.t === 'function') ? window.t('chat.unknownTool') : '未知工具');
         var idx = data.index || 0;
         var total = data.total || 0;
-        title = '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.callTool', { name: tn, index: idx, total: total }) : ('调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : '')));
+        title = ap + '🔧 ' + ((typeof window.t === 'function') ? window.t('chat.callTool', { name: tn, index: idx, total: total }) : ('调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : '')));
     } else if (eventType === 'tool_result') {
         var success = data.success !== false;
         var tname = data.toolName || '工具';
-        title = (success ? '✅ ' : '❌ ') + ((typeof window.t === 'function') ? (success ? window.t('chat.toolExecComplete', { name: tname }) : window.t('chat.toolExecFailed', { name: tname })) : (tname + (success ? ' 执行完成' : ' 执行失败')));
+        title = ap + (success ? '✅ ' : '❌ ') + ((typeof window.t === 'function') ? (success ? window.t('chat.toolExecComplete', { name: tname }) : window.t('chat.toolExecFailed', { name: tname })) : (tname + (success ? ' 执行完成' : ' 执行失败')));
+    } else if (eventType === 'eino_agent_reply') {
+        title = ap + '💬 ' + ((typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复');
     } else if (eventType === 'progress') {
         title = (typeof window.translateProgressMessage === 'function') ? window.translateProgressMessage(detail.message || '') : (detail.message || '');
     }
     var html = '<span class="webshell-ai-timeline-title">' + escapeHtml(title || '') + '</span>';
+    if (eventType === 'eino_agent_reply' && detail.message) {
+        html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(detail.message) + '</pre></div>';
+    }
     if (eventType === 'tool_call' && data && (data.argumentsObj || data.arguments)) {
         try {
-            var args = data.argumentsObj || (data.arguments ? JSON.parse(data.arguments) : null);
+            var args = data.argumentsObj;
+            if (args == null && data.arguments != null && String(data.arguments).trim() !== '') {
+                try {
+                    args = JSON.parse(String(data.arguments));
+                } catch (e2) {
+                    args = { _raw: String(data.arguments) };
+                }
+            }
             if (args && typeof args === 'object') {
                 var paramsLabel = (typeof window.t === 'function') ? window.t('timeline.params') : '参数:';
                 html += '<div class="webshell-ai-timeline-msg"><div class="tool-arg-section"><strong>' + escapeHtml(paramsLabel) + '</strong><pre class="tool-args">' + escapeHtml(JSON.stringify(args, null, 2)) + '</pre></div></div>';
@@ -738,7 +777,14 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         // 工具调用入参
         if (type === 'tool_call' && data) {
             try {
-                var args = data.argumentsObj || (data.arguments ? JSON.parse(data.arguments) : null);
+                var args = data.argumentsObj;
+                if (args == null && data.arguments != null && String(data.arguments).trim() !== '') {
+                    try {
+                        args = JSON.parse(String(data.arguments));
+                    } catch (e1) {
+                        args = { _raw: String(data.arguments) };
+                    }
+                }
                 if (args && typeof args === 'object') {
                     var paramsLabel = (typeof window.t === 'function') ? window.t('timeline.params') : '参数:';
                     html += '<div class="webshell-ai-timeline-msg"><div class="tool-arg-section"><strong>' +
@@ -750,6 +796,8 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
             } catch (e) {
                 // JSON 解析失败时忽略参数详情，避免打断主流程
             }
+        } else if (type === 'eino_agent_reply' && message) {
+            html += '<div class="webshell-ai-timeline-msg"><pre style="white-space:pre-wrap;">' + escapeHtml(message) + '</pre></div>';
         } else if (type === 'tool_result' && data) {
             // 工具调用出参
             var isError = data.isError || data.success === false;
@@ -777,7 +825,10 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
         timelineContainer.appendChild(item);
         timelineContainer.classList.add('has-items');
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return item;
     }
+
+    var einoSubReplyStreams = new Map();
 
     if (inputEl) inputEl.value = '';
 
@@ -792,10 +843,12 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
     var streamingTarget = '';  // 当前要打字显示的目标全文（用于打字机效果）
     var streamingTypingId = 0;  // 防重入，每次新 response 自增
 
-    apiFetch('/api/agent-loop/stream', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+    resolveWebshellAiStreamPath().then(function (streamPath) {
+        return apiFetch(streamPath, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
     }).then(function (response) {
         if (!response.ok) {
             assistantDiv.textContent = '请求失败: ' + response.status;
@@ -873,14 +926,15 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'thinking' && eventData.message) {
                         var thinkLabel = (typeof window.t === 'function') ? window.t('chat.aiThinking') : 'AI 思考';
-                        appendTimelineItem('thinking', '🤔 ' + thinkLabel, eventData.message, eventData.data);
+                        var thinkD = eventData.data || {};
+                        appendTimelineItem('thinking', webshellAgentPx(thinkD) + '🤔 ' + thinkLabel, eventData.message, thinkD);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'tool_calls_detected' && eventData.data) {
                         var count = eventData.data.count || 0;
                         var detectedLabel = (typeof window.t === 'function')
                             ? window.t('chat.toolCallsDetected', { count: count })
                             : ('检测到 ' + count + ' 个工具调用');
-                        appendTimelineItem('tool_calls_detected', '🔧 ' + detectedLabel, eventData.message || '', eventData.data);
+                        appendTimelineItem('tool_calls_detected', webshellAgentPx(eventData.data) + '🔧 ' + detectedLabel, eventData.message || '', eventData.data);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'tool_call' && eventData.data) {
                         var d = eventData.data;
@@ -890,7 +944,7 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         var callTitle = (typeof window.t === 'function')
                             ? window.t('chat.callTool', { name: tn, index: idx, total: total })
                             : ('调用: ' + tn + (total ? ' (' + idx + '/' + total + ')' : ''));
-                        var title = '🔧 ' + callTitle;
+                        var title = webshellAgentPx(d) + '🔧 ' + callTitle;
                         appendTimelineItem('tool_call', title, eventData.message || '', eventData.data);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     } else if (eventData.type === 'tool_result' && eventData.data) {
@@ -900,9 +954,58 @@ function runWebshellAiSend(conn, inputEl, sendBtn, messagesContainer) {
                         var titleText = (typeof window.t === 'function')
                             ? (success ? window.t('chat.toolExecComplete', { name: tname }) : window.t('chat.toolExecFailed', { name: tname }))
                             : (tname + (success ? ' 执行完成' : ' 执行失败'));
-                        var title = (success ? '✅ ' : '❌ ') + titleText;
+                        var title = webshellAgentPx(dr) + (success ? '✅ ' : '❌ ') + titleText;
                         var sub = eventData.message || (dr.result ? String(dr.result).slice(0, 300) : '');
                         appendTimelineItem('tool_result', title, sub, eventData.data);
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply_stream_start' && eventData.data && eventData.data.streamId) {
+                        var rdS = eventData.data;
+                        var repTS = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                        var runTS = (typeof window.t === 'function') ? window.t('timeline.running') : '执行中...';
+                        var itemS = document.createElement('div');
+                        itemS.className = 'webshell-ai-timeline-item webshell-ai-timeline-eino_agent_reply';
+                        itemS.innerHTML = '<span class="webshell-ai-timeline-title">' + escapeHtml(webshellAgentPx(rdS) + '💬 ' + repTS + ' · ' + runTS) + '</span>';
+                        timelineContainer.appendChild(itemS);
+                        timelineContainer.classList.add('has-items');
+                        einoSubReplyStreams.set(rdS.streamId, { el: itemS, buf: '' });
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply_stream_delta' && eventData.data && eventData.data.streamId) {
+                        var stD = einoSubReplyStreams.get(eventData.data.streamId);
+                        if (stD) {
+                            stD.buf += (eventData.message || '');
+                            var preD = stD.el.querySelector('.webshell-eino-reply-stream-body');
+                            if (!preD) {
+                                preD = document.createElement('pre');
+                                preD.className = 'webshell-ai-timeline-msg webshell-eino-reply-stream-body';
+                                preD.style.whiteSpace = 'pre-wrap';
+                                stD.el.appendChild(preD);
+                            }
+                            preD.textContent = stD.buf;
+                        }
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply_stream_end' && eventData.data && eventData.data.streamId) {
+                        var stE = einoSubReplyStreams.get(eventData.data.streamId);
+                        if (stE) {
+                            var fullE = (eventData.message != null && eventData.message !== '') ? String(eventData.message) : stE.buf;
+                            stE.buf = fullE;
+                            var repTE = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                            var titE = stE.el.querySelector('.webshell-ai-timeline-title');
+                            if (titE) titE.textContent = webshellAgentPx(eventData.data) + '💬 ' + repTE;
+                            var preE = stE.el.querySelector('.webshell-eino-reply-stream-body');
+                            if (!preE) {
+                                preE = document.createElement('pre');
+                                preE.className = 'webshell-ai-timeline-msg webshell-eino-reply-stream-body';
+                                preE.style.whiteSpace = 'pre-wrap';
+                                stE.el.appendChild(preE);
+                            }
+                            preE.textContent = fullE;
+                            einoSubReplyStreams.delete(eventData.data.streamId);
+                        }
+                        if (!streamingTarget) assistantDiv.textContent = '…';
+                    } else if (eventData.type === 'eino_agent_reply' && eventData.message) {
+                        var rd = eventData.data || {};
+                        var replyT = (typeof window.t === 'function') ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                        appendTimelineItem('eino_agent_reply', webshellAgentPx(rd) + '💬 ' + replyT, eventData.message, rd);
                         if (!streamingTarget) assistantDiv.textContent = '…';
                     }
                 } catch (e) { /* ignore parse error */ }

@@ -210,6 +210,9 @@ function toggleRoleSelectionPanel() {
     const isHidden = panel.style.display === 'none' || !panel.style.display;
     
     if (isHidden) {
+        if (typeof closeAgentModePanel === 'function') {
+            closeAgentModePanel();
+        }
         panel.style.display = 'flex'; // 使用flex布局
         // 添加打开状态的视觉反馈
         if (roleSelectorBtn) {

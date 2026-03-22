@@ -38,6 +38,7 @@ function translateProgressMessage(message) {
         '达到最大迭代次数，正在生成总结...': 'progress.maxIterSummary',
         '正在分析您的请求...': 'progress.analyzingRequestShort',
         '开始分析请求并制定测试策略': 'progress.analyzingRequestPlanning',
+        '正在启动 Eino DeepAgent...': 'progress.startingEinoDeepAgent',
         // 英文（与 en-US.json 一致，避免后端/缓存已是英文时无法随语言切换）
         'Calling AI model...': 'progress.callingAI',
         'Last iteration: generating summary and next steps...': 'progress.lastIterSummary',
@@ -45,9 +46,15 @@ function translateProgressMessage(message) {
         'Generating final reply...': 'progress.generatingFinalReply',
         'Max iterations reached, generating summary...': 'progress.maxIterSummary',
         'Analyzing your request...': 'progress.analyzingRequestShort',
-        'Analyzing your request and planning test strategy...': 'progress.analyzingRequestPlanning'
+        'Analyzing your request and planning test strategy...': 'progress.analyzingRequestPlanning',
+        'Starting Eino DeepAgent...': 'progress.startingEinoDeepAgent'
     };
     if (map[trim]) return window.t(map[trim]);
+    const einoAgentRe = /^\[Eino\]\s*(.+)$/;
+    const einoM = trim.match(einoAgentRe);
+    if (einoM) {
+        return window.t('progress.einoAgent', { name: einoM[1] });
+    }
     const callingToolPrefixCn = '正在调用工具: ';
     const callingToolPrefixEn = 'Calling tool: ';
     if (trim.indexOf(callingToolPrefixCn) === 0) {
@@ -73,10 +80,20 @@ const responseStreamStateByProgressId = new Map();
 // AI 思考流式输出：progressId -> Map(streamId -> { itemId, buffer })
 const thinkingStreamStateByProgressId = new Map();
 
+// Eino 子代理回复流式：progressId -> Map(streamId -> { itemId, buffer })
+const einoAgentReplyStreamStateByProgressId = new Map();
+
 // 工具输出流式增量：progressId::toolCallId -> { itemId, buffer }
 const toolResultStreamStateByKey = new Map();
 function toolResultStreamKey(progressId, toolCallId) {
     return String(progressId) + '::' + String(toolCallId);
+}
+
+/** Eino 多代理：时间线标题前加 [agentId]，标明哪一代理产生该工具调用/结果/回复 */
+function timelineAgentBracketPrefix(data) {
+    if (!data || data.einoAgent == null) return '';
+    const s = String(data.einoAgent).trim();
+    return s ? ('[' + s + '] ') : '';
 }
 
 // markdown 渲染（用于最终合并渲染；流式增量阶段用纯转义避免部分语法不稳定）
@@ -267,6 +284,15 @@ function toggleProgressDetails(progressId) {
     }
 }
 
+// 编排器开始输出最终回复时隐藏整条进度消息（迭代阶段保持展开可见；此处整行收起而非仅折叠时间线）
+function hideProgressMessageForFinalReply(progressId) {
+    if (!progressId) return;
+    const el = document.getElementById(progressId);
+    if (el) {
+        el.style.display = 'none';
+    }
+}
+
 // 折叠所有进度详情
 function collapseAllProgressDetails(assistantMessageId, progressId) {
     // 折叠集成到MCP区域的详情
@@ -323,10 +349,12 @@ function getAssistantId() {
     return null;
 }
 
-// 将进度详情集成到工具调用区域
-function integrateProgressToMCPSection(progressId, assistantMessageId) {
+// 将进度详情集成到工具调用区域（流式阶段助手消息不挂 mcp 条，结束时在此创建，避免图二整行 MCP 芯片样式）
+function integrateProgressToMCPSection(progressId, assistantMessageId, mcpExecutionIds) {
     const progressElement = document.getElementById(progressId);
     if (!progressElement) return;
+
+    const mcpIds = Array.isArray(mcpExecutionIds) ? mcpExecutionIds : [];
     
     // 获取时间线内容
     const timeline = document.getElementById(progressId + '-timeline');
@@ -341,13 +369,26 @@ function integrateProgressToMCPSection(progressId, assistantMessageId) {
         removeMessage(progressId);
         return;
     }
-    
-    // 查找MCP调用区域
-    const mcpSection = assistantElement.querySelector('.mcp-call-section');
-    if (!mcpSection) {
-        // 如果没有MCP区域，创建详情组件放在消息下方
-        convertProgressToDetails(progressId, assistantMessageId);
+
+    const contentWrapper = assistantElement.querySelector('.message-content');
+    if (!contentWrapper) {
+        removeMessage(progressId);
         return;
+    }
+    
+    // 查找或创建 MCP 区域
+    let mcpSection = assistantElement.querySelector('.mcp-call-section');
+    if (!mcpSection) {
+        mcpSection = document.createElement('div');
+        mcpSection.className = 'mcp-call-section';
+        const mcpLabel = document.createElement('div');
+        mcpLabel.className = 'mcp-call-label';
+        mcpLabel.textContent = '📋 ' + (typeof window.t === 'function' ? window.t('chat.penetrationTestDetail') : '渗透测试详情');
+        mcpSection.appendChild(mcpLabel);
+        const buttonsContainerInit = document.createElement('div');
+        buttonsContainerInit.className = 'mcp-call-buttons';
+        mcpSection.appendChild(buttonsContainerInit);
+        contentWrapper.appendChild(mcpSection);
     }
     
     // 获取时间线内容
@@ -362,6 +403,27 @@ function integrateProgressToMCPSection(progressId, assistantMessageId) {
         buttonsContainer = document.createElement('div');
         buttonsContainer.className = 'mcp-call-buttons';
         mcpSection.appendChild(buttonsContainer);
+    }
+
+    const hasExecBtns = buttonsContainer.querySelector('.mcp-detail-btn:not(.process-detail-btn)');
+    if (mcpIds.length > 0 && !hasExecBtns) {
+        mcpIds.forEach((execId, index) => {
+            const detailBtn = document.createElement('button');
+            detailBtn.className = 'mcp-detail-btn';
+            detailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.callNumber', { n: index + 1 }) : '调用 #' + (index + 1)) + '</span>';
+            detailBtn.onclick = () => showMCPDetail(execId);
+            buttonsContainer.appendChild(detailBtn);
+            if (typeof updateButtonWithToolName === 'function') {
+                updateButtonWithToolName(detailBtn, execId, index + 1);
+            }
+        });
+    }
+    if (!buttonsContainer.querySelector('.process-detail-btn')) {
+        const progressDetailBtn = document.createElement('button');
+        progressDetailBtn.className = 'mcp-detail-btn process-detail-btn';
+        progressDetailBtn.innerHTML = '<span>' + (typeof window.t === 'function' ? window.t('chat.expandDetail') : '展开详情') + '</span>';
+        progressDetailBtn.onclick = () => toggleProcessDetails(null, assistantMessageId);
+        buttonsContainer.appendChild(progressDetailBtn);
     }
     
     // 创建详情容器，放在MCP按钮区域下方（统一结构）
@@ -623,7 +685,8 @@ function handleStreamEvent(event, progressElement, progressId,
                 thinkingStreamStateByProgressId.set(progressId, state);
             }
             // 若已存在，重置 buffer
-            const title = '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考');
+            const thinkBase = typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考';
+            const title = timelineAgentBracketPrefix(d) + '🤔 ' + thinkBase;
             const itemId = addTimelineItem(timeline, 'thinking', {
                 title: title,
                 message: ' ',
@@ -684,7 +747,7 @@ function handleStreamEvent(event, progressElement, progressId,
             }
 
             addTimelineItem(timeline, 'thinking', {
-                title: '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考'),
+                title: timelineAgentBracketPrefix(event.data) + '🤔 ' + (typeof window.t === 'function' ? window.t('chat.aiThinking') : 'AI思考'),
                 message: event.message,
                 data: event.data
             });
@@ -692,7 +755,15 @@ function handleStreamEvent(event, progressElement, progressId,
             
         case 'tool_calls_detected':
             addTimelineItem(timeline, 'tool_calls_detected', {
-                title: '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: event.data?.count || 0 }) : '检测到 ' + (event.data?.count || 0) + ' 个工具调用'),
+                title: timelineAgentBracketPrefix(event.data) + '🔧 ' + (typeof window.t === 'function' ? window.t('chat.toolCallsDetected', { count: event.data?.count || 0 }) : '检测到 ' + (event.data?.count || 0) + ' 个工具调用'),
+                message: event.message,
+                data: event.data
+            });
+            break;
+
+        case 'warning':
+            addTimelineItem(timeline, 'warning', {
+                title: '⚠️',
                 message: event.message,
                 data: event.data
             });
@@ -706,7 +777,7 @@ function handleStreamEvent(event, progressElement, progressId,
             const toolCallId = toolInfo.toolCallId || null;
             const toolCallTitle = typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtml(toolName), index: index, total: total }) : '调用工具: ' + escapeHtml(toolName) + ' (' + index + '/' + total + ')';
             const toolCallItemId = addTimelineItem(timeline, 'tool_call', {
-                title: '🔧 ' + toolCallTitle,
+                title: timelineAgentBracketPrefix(toolInfo) + '🔧 ' + toolCallTitle,
                 message: event.message,
                 data: toolInfo,
                 expanded: false
@@ -738,7 +809,7 @@ function handleStreamEvent(event, progressElement, progressId,
             if (!state) {
                 // 首次增量：创建一个 tool_result 占位条目，后续不断更新 pre 内容
                 const runningLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
-                const title = '⏳ ' + (typeof window.t === 'function'
+                const title = timelineAgentBracketPrefix(deltaInfo) + '⏳ ' + (typeof window.t === 'function'
                     ? window.t('timeline.running')
                     : runningLabel) + ' ' + (typeof window.t === 'function' ? window.t('chat.callTool', { name: escapeHtmlLocal(toolNameDelta), index: deltaInfo.index || 0, total: deltaInfo.total || 0 }) : toolNameDelta);
 
@@ -753,7 +824,9 @@ function handleStreamEvent(event, progressElement, progressId,
                         toolCallId: toolCallId,
                         index: deltaInfo.index,
                         total: deltaInfo.total,
-                        iteration: deltaInfo.iteration
+                        iteration: deltaInfo.iteration,
+                        einoAgent: deltaInfo.einoAgent,
+                        source: deltaInfo.source
                     },
                     expanded: false
                 });
@@ -799,7 +872,10 @@ function handleStreamEvent(event, progressElement, progressId,
 
                         const titleEl = item.querySelector('.timeline-item-title');
                         if (titleEl) {
-                            titleEl.textContent = statusIcon + ' ' + resultExecText;
+                            if (resultInfo.einoAgent != null && String(resultInfo.einoAgent).trim() !== '') {
+                                item.dataset.einoAgent = String(resultInfo.einoAgent).trim();
+                            }
+                            titleEl.textContent = timelineAgentBracketPrefix(resultInfo) + statusIcon + ' ' + resultExecText;
                         }
                     }
                     toolResultStreamStateByKey.delete(key);
@@ -818,12 +894,112 @@ function handleStreamEvent(event, progressElement, progressId,
                 toolCallStatusMap.delete(resultToolCallId);
             }
             addTimelineItem(timeline, 'tool_result', {
-                title: statusIcon + ' ' + resultExecText,
+                title: timelineAgentBracketPrefix(resultInfo) + statusIcon + ' ' + resultExecText,
                 message: event.message,
                 data: resultInfo,
                 expanded: false
             });
             break;
+
+        case 'eino_agent_reply_stream_start': {
+            const d = event.data || {};
+            const streamId = d.streamId || null;
+            if (!streamId) break;
+            let stateMap = einoAgentReplyStreamStateByProgressId.get(progressId);
+            if (!stateMap) {
+                stateMap = new Map();
+                einoAgentReplyStreamStateByProgressId.set(progressId, stateMap);
+            }
+            const streamingLabel = typeof window.t === 'function' ? window.t('timeline.running') : '执行中...';
+            const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+            const itemId = addTimelineItem(timeline, 'eino_agent_reply', {
+                title: timelineAgentBracketPrefix(d) + '💬 ' + replyTitleBase + ' · ' + streamingLabel,
+                message: ' ',
+                data: d,
+                expanded: false
+            });
+            stateMap.set(streamId, { itemId, buffer: '' });
+            break;
+        }
+
+        case 'eino_agent_reply_stream_delta': {
+            const d = event.data || {};
+            const streamId = d.streamId || null;
+            if (!streamId) break;
+            const delta = event.message || '';
+            if (!delta) break;
+            const stateMap = einoAgentReplyStreamStateByProgressId.get(progressId);
+            if (!stateMap || !stateMap.has(streamId)) break;
+            const s = stateMap.get(streamId);
+            s.buffer += delta;
+            const item = document.getElementById(s.itemId);
+            if (item) {
+                let contentEl = item.querySelector('.timeline-item-content');
+                if (!contentEl) {
+                    const header = item.querySelector('.timeline-item-header');
+                    if (header) {
+                        contentEl = document.createElement('div');
+                        contentEl.className = 'timeline-item-content';
+                        item.appendChild(contentEl);
+                    }
+                }
+                if (contentEl) {
+                    if (typeof formatMarkdown === 'function') {
+                        contentEl.innerHTML = formatMarkdown(s.buffer);
+                    } else {
+                        contentEl.textContent = s.buffer;
+                    }
+                }
+            }
+            break;
+        }
+
+        case 'eino_agent_reply_stream_end': {
+            const d = event.data || {};
+            const streamId = d.streamId || null;
+            const stateMap = einoAgentReplyStreamStateByProgressId.get(progressId);
+            if (streamId && stateMap && stateMap.has(streamId)) {
+                const s = stateMap.get(streamId);
+                const full = (event.message != null && event.message !== '') ? String(event.message) : s.buffer;
+                s.buffer = full;
+                const item = document.getElementById(s.itemId);
+                if (item) {
+                    const titleEl = item.querySelector('.timeline-item-title');
+                    if (titleEl) {
+                        const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+                        titleEl.textContent = timelineAgentBracketPrefix(d) + '💬 ' + replyTitleBase;
+                    }
+                    let contentEl = item.querySelector('.timeline-item-content');
+                    if (!contentEl) {
+                        contentEl = document.createElement('div');
+                        contentEl.className = 'timeline-item-content';
+                        item.appendChild(contentEl);
+                    }
+                    if (typeof formatMarkdown === 'function') {
+                        contentEl.innerHTML = formatMarkdown(full);
+                    } else {
+                        contentEl.textContent = full;
+                    }
+                    if (d.einoAgent != null && String(d.einoAgent).trim() !== '') {
+                        item.dataset.einoAgent = String(d.einoAgent).trim();
+                    }
+                }
+                stateMap.delete(streamId);
+            }
+            break;
+        }
+
+        case 'eino_agent_reply': {
+            const replyData = event.data || {};
+            const replyTitleBase = typeof window.t === 'function' ? window.t('chat.einoAgentReplyTitle') : '子代理回复';
+            addTimelineItem(timeline, 'eino_agent_reply', {
+                title: timelineAgentBracketPrefix(replyData) + '💬 ' + replyTitleBase,
+                message: event.message || '',
+                data: replyData,
+                expanded: false
+            });
+            break;
+        }
             
         case 'progress':
             const progressTitle = document.querySelector(`#${progressId} .progress-title`);
@@ -880,7 +1056,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (assistantElement) {
                     const detailsId = 'process-details-' + assistantId;
                     if (!document.getElementById(detailsId)) {
-                        integrateProgressToMCPSection(progressId, assistantId);
+                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
                     }
                     // 立即折叠详情（取消时应该默认折叠）
                     setTimeout(() => {
@@ -894,7 +1070,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 
                 // 将进度详情集成到工具调用区域
                 setTimeout(() => {
-                    integrateProgressToMCPSection(progressId, assistantId);
+                    integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
                     // 确保详情默认折叠
                     collapseAllProgressDetails(assistantId, progressId);
                 }, 100);
@@ -925,6 +1101,9 @@ function handleStreamEvent(event, progressElement, progressId,
                 loadActiveTasks();
             }
 
+            // 主回复开始流式输出时隐藏整条进度卡片（迭代阶段默认展开；最终回复时不再占屏）
+            hideProgressMessageForFinalReply(progressId);
+
             // 已存在则复用；否则创建空助手消息占位，用于增量追加
             const existing = responseStreamStateByProgressId.get(progressId);
             if (existing && existing.assistantId) break;
@@ -946,6 +1125,8 @@ function handleStreamEvent(event, progressElement, progressId,
                     break;
                 }
             }
+
+            hideProgressMessageForFinalReply(progressId);
 
             let state = responseStreamStateByProgressId.get(progressId);
             if (!state || !state.assistantId) {
@@ -999,7 +1180,7 @@ function handleStreamEvent(event, progressElement, progressId,
             }
 
             // 将进度详情集成到工具调用区域（放在最终 response 之后，保证时间线已完整）
-            integrateProgressToMCPSection(progressId, assistantIdFinal);
+            integrateProgressToMCPSection(progressId, assistantIdFinal, mcpIds);
             responseStreamStateByProgressId.delete(progressId);
 
             setTimeout(() => {
@@ -1059,7 +1240,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 if (assistantElement) {
                     const detailsId = 'process-details-' + assistantId;
                     if (!document.getElementById(detailsId)) {
-                        integrateProgressToMCPSection(progressId, assistantId);
+                        integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
                     }
                     // 立即折叠详情（错误时应该默认折叠）
                     setTimeout(() => {
@@ -1073,7 +1254,7 @@ function handleStreamEvent(event, progressElement, progressId,
                 
                 // 将进度详情集成到工具调用区域
                 setTimeout(() => {
-                    integrateProgressToMCPSection(progressId, assistantId);
+                    integrateProgressToMCPSection(progressId, assistantId, typeof getMcpIds === 'function' ? (getMcpIds() || []) : []);
                     // 确保详情默认折叠
                     collapseAllProgressDetails(assistantId, progressId);
                 }, 100);
@@ -1087,6 +1268,7 @@ function handleStreamEvent(event, progressElement, progressId,
             // 清理流式输出状态
             responseStreamStateByProgressId.delete(progressId);
             thinkingStreamStateByProgressId.delete(progressId);
+            einoAgentReplyStreamStateByProgressId.delete(progressId);
             // 清理工具流式输出占位
             const prefix = String(progressId) + '::';
             for (const key of Array.from(toolResultStreamStateByKey.keys())) {
@@ -1213,6 +1395,9 @@ function addTimelineItem(timeline, type, options) {
         item.dataset.toolName = (d.toolName != null && d.toolName !== '') ? String(d.toolName) : '';
         item.dataset.toolSuccess = d.success !== false ? '1' : '0';
     }
+    if (options.data && options.data.einoAgent != null && String(options.data.einoAgent).trim() !== '') {
+        item.dataset.einoAgent = String(options.data.einoAgent).trim();
+    }
 
     // 使用传入的createdAt时间，如果没有则使用当前时间（向后兼容）
     let eventTime;
@@ -1253,7 +1438,17 @@ function addTimelineItem(timeline, type, options) {
         content += `<div class="timeline-item-content">${formatMarkdown(options.message)}</div>`;
     } else if (type === 'tool_call' && options.data) {
         const data = options.data;
-        const args = data.argumentsObj || (data.arguments ? JSON.parse(data.arguments) : {});
+        let args = data.argumentsObj;
+        if (args == null && data.arguments != null && String(data.arguments).trim() !== '') {
+            try {
+                args = JSON.parse(String(data.arguments));
+            } catch (e) {
+                args = { _raw: String(data.arguments) };
+            }
+        }
+        if (args == null || typeof args !== 'object') {
+            args = {};
+        }
         const paramsLabel = typeof window.t === 'function' ? window.t('timeline.params') : '参数:';
         content += `
             <div class="timeline-item-content">
@@ -1265,6 +1460,8 @@ function addTimelineItem(timeline, type, options) {
                 </div>
             </div>
         `;
+    } else if (type === 'eino_agent_reply' && options.message) {
+        content += `<div class="timeline-item-content">${formatMarkdown(options.message)}</div>`;
     } else if (type === 'tool_result' && options.data) {
         const data = options.data;
         const isError = data.isError || !data.success;
@@ -2094,24 +2291,27 @@ function refreshProgressAndTimelineI18n() {
         const titleSpan = item.querySelector('.timeline-item-title');
         const timeSpan = item.querySelector('.timeline-item-time');
         if (!titleSpan) return;
+        const ap = (item.dataset.einoAgent && item.dataset.einoAgent !== '') ? ('[' + item.dataset.einoAgent + '] ') : '';
         if (type === 'iteration' && item.dataset.iterationN) {
             const n = parseInt(item.dataset.iterationN, 10) || 1;
-            titleSpan.textContent = _t('chat.iterationRound', { n: n });
+            titleSpan.textContent = ap + _t('chat.iterationRound', { n: n });
         } else if (type === 'thinking') {
-            titleSpan.textContent = '\uD83E\uDD14 ' + _t('chat.aiThinking');
+            titleSpan.textContent = ap + '\uD83E\uDD14 ' + _t('chat.aiThinking');
         } else if (type === 'tool_calls_detected' && item.dataset.toolCallsCount != null) {
             const count = parseInt(item.dataset.toolCallsCount, 10) || 0;
-            titleSpan.textContent = '\uD83D\uDD27 ' + _t('chat.toolCallsDetected', { count: count });
+            titleSpan.textContent = ap + '\uD83D\uDD27 ' + _t('chat.toolCallsDetected', { count: count });
         } else if (type === 'tool_call' && (item.dataset.toolName !== undefined || item.dataset.toolIndex !== undefined)) {
             const name = (item.dataset.toolName != null && item.dataset.toolName !== '') ? item.dataset.toolName : _t('chat.unknownTool');
             const index = parseInt(item.dataset.toolIndex, 10) || 0;
             const total = parseInt(item.dataset.toolTotal, 10) || 0;
-            titleSpan.textContent = '\uD83D\uDD27 ' + _t('chat.callTool', { name: name, index: index, total: total });
+            titleSpan.textContent = ap + '\uD83D\uDD27 ' + _t('chat.callTool', { name: name, index: index, total: total });
         } else if (type === 'tool_result' && (item.dataset.toolName !== undefined || item.dataset.toolSuccess !== undefined)) {
             const name = (item.dataset.toolName != null && item.dataset.toolName !== '') ? item.dataset.toolName : _t('chat.unknownTool');
             const success = item.dataset.toolSuccess === '1';
             const icon = success ? '\u2705 ' : '\u274C ';
-            titleSpan.textContent = icon + (success ? _t('chat.toolExecComplete', { name: name }) : _t('chat.toolExecFailed', { name: name }));
+            titleSpan.textContent = ap + icon + (success ? _t('chat.toolExecComplete', { name: name }) : _t('chat.toolExecFailed', { name: name }));
+        } else if (type === 'eino_agent_reply') {
+            titleSpan.textContent = ap + '\uD83D\uDCAC ' + _t('chat.einoAgentReplyTitle');
         } else if (type === 'cancelled') {
             titleSpan.textContent = '\u26D4 ' + _t('chat.taskCancelled');
         } else if (type === 'progress' && item.dataset.progressMessage !== undefined) {
