@@ -97,6 +97,14 @@ CyberStrikeAI is an **AI-native security testing platform** built in Go. It inte
 - 📱 **Chatbot**: DingTalk and Lark (Feishu) long-lived connections so you can talk to CyberStrikeAI from mobile (see [Robot / Chatbot guide](docs/robot_en.md) for setup and commands)
  - 🐚 **WebShell management**: Add and manage WebShell connections (e.g. IceSword/AntSword compatible), use a virtual terminal for command execution, a built-in file manager for file operations, and an AI assistant tab that orchestrates tests and keeps per-connection conversation history; supports PHP, ASP, ASPX, JSP and custom shell types with configurable request method and command parameter.
 
+## Plugins
+
+CyberStrikeAI includes optional integrations under `plugins/`.
+
+- **Burp Suite extension**: `plugins/burp-suite/cyberstrikeai-burp-extension/`  
+  Build output: `plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
+  Docs: `plugins/burp-suite/cyberstrikeai-burp-extension/README.md`
+
 ## Tool Overview
 
 CyberStrikeAI ships with 100+ curated tools covering the whole kill chain:

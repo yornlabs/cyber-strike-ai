@@ -96,6 +96,14 @@ CyberStrikeAI 是一款 **AI 原生安全测试平台**，基于 Go 构建，集
 - 📱 **机器人**：支持钉钉、飞书长连接，在手机端与 CyberStrikeAI 对话（配置与命令详见 [机器人使用说明](docs/robot.md)）
 - 🐚 **WebShell 管理**：添加与管理 WebShell 连接（兼容冰蝎/蚁剑等），通过虚拟终端执行命令、内置文件管理进行文件操作，并提供按连接维度保存历史的 AI 助手标签页；支持 PHP/ASP/ASPX/JSP 及自定义类型，可配置请求方法与命令参数。
 
+## 插件（Plugins）
+
+可选集成在 `plugins/` 目录下。
+
+- **Burp Suite 插件**：`plugins/burp-suite/cyberstrikeai-burp-extension/`  
+  构建产物：`plugins/burp-suite/cyberstrikeai-burp-extension/dist/cyberstrikeai-burp-extension.jar`  
+  说明文档：`plugins/burp-suite/cyberstrikeai-burp-extension/README.zh-CN.md`
+
 ## 工具概览
 
 系统预置 100+ 渗透/攻防工具，覆盖完整攻击链：
