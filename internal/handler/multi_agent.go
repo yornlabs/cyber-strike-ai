@@ -129,6 +129,10 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		"conversationId": conversationID,
 	})
 
+	stopKeepalive := make(chan struct{})
+	go sseKeepalive(c, stopKeepalive)
+	defer close(stopKeepalive)
+
 	result, runErr := multiagent.RunDeepAgent(
 		taskCtx,
 		h.config,

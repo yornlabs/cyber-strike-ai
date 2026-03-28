@@ -1065,6 +1065,10 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	// 执行Agent Loop，传入独立的上下文，确保任务不会因客户端断开而中断（使用包含角色提示词的finalMessage和角色工具列表）
 	sendEvent("progress", "正在分析您的请求...", nil)
 	// 注意：roleSkills 已在上方根据 req.Role 或 WebShell 模式设置
+	stopKeepalive := make(chan struct{})
+	go sseKeepalive(c, stopKeepalive)
+	defer close(stopKeepalive)
+
 	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools, roleSkills)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
