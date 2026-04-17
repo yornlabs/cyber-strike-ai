@@ -89,7 +89,7 @@ type AgentHandler struct {
 
 // NewAgentHandler 创建新的Agent处理器
 func NewAgentHandler(agent *agent.Agent, db *database.DB, cfg *config.Config, logger *zap.Logger) *AgentHandler {
-	batchTaskManager := NewBatchTaskManager()
+	batchTaskManager := NewBatchTaskManager(logger)
 	batchTaskManager.SetDB(db)
 
 	// 从数据库加载所有批量任务队列
@@ -1650,7 +1650,11 @@ func (h *AgentHandler) CreateBatchQueue(c *gin.Context) {
 		nextRunAt = &next
 	}
 
-	queue := h.batchTaskManager.CreateBatchQueue(req.Title, req.Role, agentMode, scheduleMode, cronExpr, nextRunAt, validTasks)
+	queue, createErr := h.batchTaskManager.CreateBatchQueue(req.Title, req.Role, agentMode, scheduleMode, cronExpr, nextRunAt, validTasks)
+	if createErr != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": createErr.Error()})
+		return
+	}
 	started := false
 	if req.ExecuteNow {
 		ok, err := h.startBatchQueueExecution(queue.ID, false)
@@ -1721,6 +1725,11 @@ func (h *AgentHandler) ListBatchQueues(c *gin.Context) {
 	if offset < 0 {
 		offset = 0
 	}
+	// 防止恶意大 offset 导致 DB 性能问题
+	const maxOffset = 100000
+	if offset > maxOffset {
+		offset = maxOffset
+	}
 
 	// 默认status为"all"
 	if status == "" {
@@ -1781,6 +1790,67 @@ func (h *AgentHandler) PauseBatchQueue(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "批量任务已暂停"})
+}
+
+// UpdateBatchQueueMetadata 修改批量任务队列的标题和角色
+func (h *AgentHandler) UpdateBatchQueueMetadata(c *gin.Context) {
+	queueID := c.Param("queueId")
+	var req struct {
+		Title string `json:"title"`
+		Role  string `json:"role"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := h.batchTaskManager.UpdateQueueMetadata(queueID, req.Title, req.Role); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	updated, _ := h.batchTaskManager.GetBatchQueue(queueID)
+	c.JSON(http.StatusOK, gin.H{"queue": updated})
+}
+
+// UpdateBatchQueueSchedule 修改批量任务队列的调度配置（scheduleMode / cronExpr）
+func (h *AgentHandler) UpdateBatchQueueSchedule(c *gin.Context) {
+	queueID := c.Param("queueId")
+	queue, exists := h.batchTaskManager.GetBatchQueue(queueID)
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "队列不存在"})
+		return
+	}
+	// 仅在非 running 状态下允许修改调度
+	if queue.Status == "running" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "队列正在运行中，无法修改调度配置"})
+		return
+	}
+	var req struct {
+		ScheduleMode string `json:"scheduleMode"`
+		CronExpr     string `json:"cronExpr"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	scheduleMode := normalizeBatchQueueScheduleMode(req.ScheduleMode)
+	cronExpr := strings.TrimSpace(req.CronExpr)
+	var nextRunAt *time.Time
+	if scheduleMode == "cron" {
+		if cronExpr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "启用 Cron 调度时，调度表达式不能为空"})
+			return
+		}
+		schedule, err := h.batchCronParser.Parse(cronExpr)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "无效的 Cron 表达式: " + err.Error()})
+			return
+		}
+		next := schedule.Next(time.Now())
+		nextRunAt = &next
+	}
+	h.batchTaskManager.UpdateQueueSchedule(queueID, scheduleMode, cronExpr, nextRunAt)
+	updated, _ := h.batchTaskManager.GetBatchQueue(queueID)
+	c.JSON(http.StatusOK, gin.H{"queue": updated})
 }
 
 // SetBatchQueueScheduleEnabled 开启/关闭 Cron 自动调度（手工执行不受影响）

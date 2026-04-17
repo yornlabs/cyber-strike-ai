@@ -161,7 +161,7 @@ agent_mode: single（默认）或 multi（需系统启用多代理）。schedule
 				},
 				"cron_expr": map[string]interface{}{
 					"type":        "string",
-					"description": "schedule_mode 为 cron 时必填",
+					"description": "schedule_mode 为 cron 时必填。标准 5 段格式：分钟 小时 日 月 星期，例如 \"0 */6 * * *\"（每6小时）、\"30 2 * * 1-5\"（工作日凌晨2:30）",
 				},
 				"execute_now": map[string]interface{}{
 					"type":        "boolean",
@@ -195,7 +195,10 @@ agent_mode: single（默认）或 multi（需系统启用多代理）。schedule
 		if !ok {
 			executeNow = false
 		}
-		queue := h.batchTaskManager.CreateBatchQueue(title, role, agentMode, scheduleMode, cronExpr, nextRunAt, tasks)
+		queue, createErr := h.batchTaskManager.CreateBatchQueue(title, role, agentMode, scheduleMode, cronExpr, nextRunAt, tasks)
+		if createErr != nil {
+			return batchMCPTextResult("创建队列失败: "+createErr.Error(), true), nil
+		}
 		started := false
 		if executeNow {
 			ok, err := h.startBatchQueueExecution(queue.ID, false)
@@ -309,6 +312,101 @@ agent_mode: single（默认）或 multi（需系统启用多代理）。schedule
 		}
 		logger.Info("MCP batch_task_delete", zap.String("queueId", qid))
 		return batchMCPTextResult("队列已删除。", false), nil
+	})
+
+	// --- update metadata (title/role) ---
+	reg(mcp.Tool{
+		Name:             builtin.ToolBatchTaskUpdateMetadata,
+		Description:      "修改批量任务队列的标题和角色。仅在队列非 running 状态下可修改。",
+		ShortDescription: "修改批量任务队列标题/角色",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"queue_id": map[string]interface{}{
+					"type":        "string",
+					"description": "队列 ID",
+				},
+				"title": map[string]interface{}{
+					"type":        "string",
+					"description": "新标题（空字符串清除标题）",
+				},
+				"role": map[string]interface{}{
+					"type":        "string",
+					"description": "新角色名（空字符串使用默认角色）",
+				},
+			},
+			"required": []string{"queue_id"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		qid := mcpArgString(args, "queue_id")
+		if qid == "" {
+			return batchMCPTextResult("queue_id 不能为空", true), nil
+		}
+		title := mcpArgString(args, "title")
+		role := mcpArgString(args, "role")
+		if err := h.batchTaskManager.UpdateQueueMetadata(qid, title, role); err != nil {
+			return batchMCPTextResult(err.Error(), true), nil
+		}
+		updated, _ := h.batchTaskManager.GetBatchQueue(qid)
+		logger.Info("MCP batch_task_update_metadata", zap.String("queueId", qid))
+		return batchMCPJSONResult(updated)
+	})
+
+	// --- update schedule ---
+	reg(mcp.Tool{
+		Name: builtin.ToolBatchTaskUpdateSchedule,
+		Description: `修改批量任务队列的调度方式和 Cron 表达式。仅在队列非 running 状态下可修改。
+schedule_mode 为 cron 时必须提供有效 cron_expr；为 manual 时会清除 Cron 配置。`,
+		ShortDescription: "修改批量任务调度配置（Cron 表达式）",
+		InputSchema: map[string]interface{}{
+			"type": "object",
+			"properties": map[string]interface{}{
+				"queue_id": map[string]interface{}{
+					"type":        "string",
+					"description": "队列 ID",
+				},
+				"schedule_mode": map[string]interface{}{
+					"type":        "string",
+					"description": "manual 或 cron",
+					"enum":        []string{"manual", "cron"},
+				},
+				"cron_expr": map[string]interface{}{
+					"type":        "string",
+					"description": "Cron 表达式（schedule_mode 为 cron 时必填）。标准 5 段格式：分钟 小时 日 月 星期，如 \"0 */6 * * *\"（每6小时）、\"30 2 * * 1-5\"（工作日凌晨2:30）",
+				},
+			},
+			"required": []string{"queue_id", "schedule_mode"},
+		},
+	}, func(ctx context.Context, args map[string]interface{}) (*mcp.ToolResult, error) {
+		qid := mcpArgString(args, "queue_id")
+		if qid == "" {
+			return batchMCPTextResult("queue_id 不能为空", true), nil
+		}
+		queue, exists := h.batchTaskManager.GetBatchQueue(qid)
+		if !exists {
+			return batchMCPTextResult("队列不存在: "+qid, true), nil
+		}
+		if queue.Status == "running" {
+			return batchMCPTextResult("队列正在运行中，无法修改调度配置", true), nil
+		}
+		scheduleMode := normalizeBatchQueueScheduleMode(mcpArgString(args, "schedule_mode"))
+		cronExpr := strings.TrimSpace(mcpArgString(args, "cron_expr"))
+		var nextRunAt *time.Time
+		if scheduleMode == "cron" {
+			if cronExpr == "" {
+				return batchMCPTextResult("Cron 调度模式下 cron_expr 不能为空", true), nil
+			}
+			sch, err := h.batchCronParser.Parse(cronExpr)
+			if err != nil {
+				return batchMCPTextResult("无效的 Cron 表达式: "+err.Error(), true), nil
+			}
+			n := sch.Next(time.Now())
+			nextRunAt = &n
+		}
+		h.batchTaskManager.UpdateQueueSchedule(qid, scheduleMode, cronExpr, nextRunAt)
+		updated, _ := h.batchTaskManager.GetBatchQueue(qid)
+		logger.Info("MCP batch_task_update_schedule", zap.String("queueId", qid), zap.String("scheduleMode", scheduleMode), zap.String("cronExpr", cronExpr))
+		return batchMCPJSONResult(updated)
 	})
 
 	// --- schedule enabled ---
@@ -456,7 +554,7 @@ agent_mode: single（默认）或 multi（需系统启用多代理）。schedule
 		return batchMCPJSONResult(queue)
 	})
 
-	logger.Info("批量任务 MCP 工具已注册", zap.Int("count", 10))
+	logger.Info("批量任务 MCP 工具已注册", zap.Int("count", 12))
 }
 
 // --- batch_task_list 精简结构（避免把每条子任务的 result 等大段文本塞进列表上下文） ---
@@ -509,6 +607,8 @@ func truncateStringRunes(s string, maxRunes int) string {
 	return s
 }
 
+const mcpBatchListMaxTasksPerQueue = 200 // 列表中每个队列最多返回的子任务摘要数
+
 func toBatchTaskQueueMCPListItem(q *BatchTaskQueue) batchTaskQueueMCPListItem {
 	counts := map[string]int{
 		"pending":   0,
@@ -523,11 +623,14 @@ func toBatchTaskQueueMCPListItem(q *BatchTaskQueue) batchTaskQueueMCPListItem {
 			continue
 		}
 		counts[t.Status]++
-		tasks = append(tasks, batchTaskMCPListSummary{
-			ID:      t.ID,
-			Status:  t.Status,
-			Message: truncateStringRunes(t.Message, mcpBatchListTaskMessageMaxRunes),
-		})
+		// 列表视图限制子任务摘要数量，完整列表通过 batch_task_get 查看
+		if len(tasks) < mcpBatchListMaxTasksPerQueue {
+			tasks = append(tasks, batchTaskMCPListSummary{
+				ID:      t.ID,
+				Status:  t.Status,
+				Message: truncateStringRunes(t.Message, mcpBatchListTaskMessageMaxRunes),
+			})
+		}
 	}
 	return batchTaskQueueMCPListItem{
 		ID:                    q.ID,

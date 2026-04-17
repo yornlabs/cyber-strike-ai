@@ -352,6 +352,18 @@ func (db *DB) UpdateBatchQueueCurrentIndex(queueID string, currentIndex int) err
 	return nil
 }
 
+// UpdateBatchQueueMetadata 更新批量任务队列标题和角色
+func (db *DB) UpdateBatchQueueMetadata(queueID, title, role string) error {
+	_, err := db.Exec(
+		"UPDATE batch_task_queues SET title = ?, role = ? WHERE id = ?",
+		title, role, queueID,
+	)
+	if err != nil {
+		return fmt.Errorf("更新批量任务队列元数据失败: %w", err)
+	}
+	return nil
+}
+
 // UpdateBatchQueueSchedule 更新批量任务队列调度相关信息
 func (db *DB) UpdateBatchQueueSchedule(queueID, scheduleMode, cronExpr string, nextRunAt *time.Time) error {
 	var nextRunAtValue interface{}
@@ -435,7 +447,7 @@ func (db *DB) ResetBatchQueueForRerun(queueID string) error {
 	defer tx.Rollback()
 
 	_, err = tx.Exec(
-		"UPDATE batch_task_queues SET status = ?, current_index = 0, started_at = NULL, completed_at = NULL WHERE id = ?",
+		"UPDATE batch_task_queues SET status = ?, current_index = 0, started_at = NULL, completed_at = NULL, last_run_error = NULL, last_schedule_error = NULL WHERE id = ?",
 		"pending", queueID,
 	)
 	if err != nil {
