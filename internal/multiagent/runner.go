@@ -205,9 +205,6 @@ func RunDeepAgent(
 			if instr == "" {
 				instr = "你是 CyberStrikeAI 中的专业子代理，在授权渗透测试场景下协助完成用户委托的子任务。优先使用可用工具获取证据，回答简洁专业。"
 			}
-			if supplement := buildUserContextForSubAgent(userMessage, history, ma.SubAgentUserContextMaxRunes); supplement != "" {
-				instr += supplement
-			}
 
 			roleTools := sub.RoleTools
 			bind := strings.TrimSpace(sub.BindRole)
@@ -344,6 +341,9 @@ func RunDeepAgent(
 
 	// noNestedTaskMiddleware 必须在最外层（最先拦截），防止 skill 或其他中间件内部触发 task 调用绕过检测。
 	deepHandlers := []adk.ChatModelAgentMiddleware{newNoNestedTaskMiddleware()}
+	if mw := newTaskContextEnrichMiddleware(userMessage, history, ma.SubAgentUserContextMaxRunes); mw != nil {
+		deepHandlers = append(deepHandlers, mw)
+	}
 	if len(mainOrchestratorPre) > 0 {
 		deepHandlers = append(deepHandlers, mainOrchestratorPre...)
 	}
