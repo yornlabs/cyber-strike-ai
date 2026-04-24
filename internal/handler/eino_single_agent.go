@@ -281,8 +281,10 @@ func (h *AgentHandler) EinoSingleAgentLoop(c *gin.Context) {
 	}
 	baseCtx, cancelWithCause := context.WithCancelCause(c.Request.Context())
 	defer cancelWithCause(nil)
-	progressCallback := h.createProgressCallback(baseCtx, cancelWithCause, prep.ConversationID, prep.AssistantMessageID, progressCallbackRaw)
-	baseCtx = multiagent.WithHITLToolInterceptor(baseCtx, func(ctx context.Context, toolName, arguments string) (string, error) {
+	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 600*time.Minute)
+	defer timeoutCancel()
+	progressCallback := h.createProgressCallback(taskCtx, cancelWithCause, prep.ConversationID, prep.AssistantMessageID, progressCallbackRaw)
+	taskCtx = multiagent.WithHITLToolInterceptor(taskCtx, func(ctx context.Context, toolName, arguments string) (string, error) {
 		return h.interceptHITLForEinoTool(ctx, cancelWithCause, prep.ConversationID, prep.AssistantMessageID, nil, toolName, arguments)
 	})
 
@@ -292,7 +294,7 @@ func (h *AgentHandler) EinoSingleAgentLoop(c *gin.Context) {
 	}
 
 	result, runErr := multiagent.RunEinoSingleChatModelAgent(
-		baseCtx,
+		taskCtx,
 		h.config,
 		&h.config.MultiAgent,
 		h.agent,

@@ -603,11 +603,13 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 
 	baseCtx, cancelWithCause := context.WithCancelCause(c.Request.Context())
 	defer cancelWithCause(nil)
-	progressCallback := h.createProgressCallback(baseCtx, cancelWithCause, conversationID, "", nil)
-	baseCtx = h.injectReactHITLInterceptor(baseCtx, cancelWithCause, conversationID, "", nil)
+	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 600*time.Minute)
+	defer timeoutCancel()
+	progressCallback := h.createProgressCallback(taskCtx, cancelWithCause, conversationID, "", nil)
+	taskCtx = h.injectReactHITLInterceptor(taskCtx, cancelWithCause, conversationID, "", nil)
 
 	// 执行Agent Loop，传入历史消息和对话ID（使用包含角色提示词的finalMessage和角色工具列表）
-	result, err := h.agent.AgentLoopWithProgress(baseCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools)
+	result, err := h.agent.AgentLoopWithProgress(taskCtx, finalMessage, agentHistoryMessages, conversationID, progressCallback, roleTools)
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 
@@ -1209,6 +1211,9 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		}
 		eventJSON, _ := json.Marshal(event)
 		fmt.Fprintf(c.Writer, "data: %s\n\n", eventJSON)
+		done := StreamEvent{Type: "done", Message: ""}
+		doneJSON, _ := json.Marshal(done)
+		fmt.Fprintf(c.Writer, "data: %s\n\n", doneJSON)
 		c.Writer.Flush()
 		return
 	}

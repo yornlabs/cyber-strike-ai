@@ -40,6 +40,9 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		event := StreamEvent{Type: "error", Message: "请求参数错误: " + err.Error()}
 		b, _ := json.Marshal(event)
 		fmt.Fprintf(c.Writer, "data: %s\n\n", b)
+		done := StreamEvent{Type: "done", Message: ""}
+		db, _ := json.Marshal(done)
+		fmt.Fprintf(c.Writer, "data: %s\n\n", db)
 		c.Writer.Flush()
 		return
 	}
@@ -293,13 +296,15 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 
 	baseCtx, cancelWithCause := context.WithCancelCause(c.Request.Context())
 	defer cancelWithCause(nil)
-	progressCallback := h.createProgressCallback(baseCtx, cancelWithCause, prep.ConversationID, prep.AssistantMessageID, nil)
-	baseCtx = multiagent.WithHITLToolInterceptor(baseCtx, func(ctx context.Context, toolName, arguments string) (string, error) {
+	taskCtx, timeoutCancel := context.WithTimeout(baseCtx, 600*time.Minute)
+	defer timeoutCancel()
+	progressCallback := h.createProgressCallback(taskCtx, cancelWithCause, prep.ConversationID, prep.AssistantMessageID, nil)
+	taskCtx = multiagent.WithHITLToolInterceptor(taskCtx, func(ctx context.Context, toolName, arguments string) (string, error) {
 		return h.interceptHITLForEinoTool(ctx, cancelWithCause, prep.ConversationID, prep.AssistantMessageID, nil, toolName, arguments)
 	})
 
 	result, runErr := multiagent.RunDeepAgent(
-		baseCtx,
+		taskCtx,
 		h.config,
 		&h.config.MultiAgent,
 		h.agent,
