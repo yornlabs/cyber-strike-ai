@@ -28,20 +28,20 @@ import (
 )
 
 const (
-	robotCmdHelp        = "帮助"
-	robotCmdList        = "列表"
-	robotCmdListAlt     = "对话列表"
-	robotCmdSwitch      = "切换"
-	robotCmdContinue    = "继续"
-	robotCmdNew         = "新对话"
-	robotCmdClear       = "清空"
-	robotCmdCurrent     = "当前"
-	robotCmdStop        = "停止"
-	robotCmdRoles       = "角色"
-	robotCmdRolesList   = "角色列表"
-	robotCmdSwitchRole  = "切换角色"
-	robotCmdDelete      = "删除"
-	robotCmdVersion     = "版本"
+	robotCmdHelp       = "帮助"
+	robotCmdList       = "列表"
+	robotCmdListAlt    = "对话列表"
+	robotCmdSwitch     = "切换"
+	robotCmdContinue   = "继续"
+	robotCmdNew        = "新对话"
+	robotCmdClear      = "清空"
+	robotCmdCurrent    = "当前"
+	robotCmdStop       = "停止"
+	robotCmdRoles      = "角色"
+	robotCmdRolesList  = "角色列表"
+	robotCmdSwitchRole = "切换角色"
+	robotCmdDelete     = "删除"
+	robotCmdVersion    = "版本"
 )
 
 // RobotHandler 企业微信/钉钉/飞书等机器人回调处理

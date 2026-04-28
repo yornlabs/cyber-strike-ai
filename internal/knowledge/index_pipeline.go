@@ -8,8 +8,8 @@ import (
 
 	"cyberstrike-ai/internal/config"
 
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/components/document"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
 

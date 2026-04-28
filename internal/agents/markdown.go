@@ -256,11 +256,11 @@ func orchestratorConfigFromOrchestrator(o *OrchestratorMarkdown) config.MultiAge
 		return config.MultiAgentSubConfig{}
 	}
 	return config.MultiAgentSubConfig{
-		ID:            o.EinoName,
-		Name:          o.DisplayName,
-		Description:   o.Description,
-		Instruction:   o.Instruction,
-		Kind:          "orchestrator",
+		ID:          o.EinoName,
+		Name:        o.DisplayName,
+		Description: o.Description,
+		Instruction: o.Instruction,
+		Kind:        "orchestrator",
 	}
 }
 

@@ -65,19 +65,19 @@ func (h *SkillsHandler) GetSkills(c *gin.Context) {
 	allSkillsInfo := make([]map[string]interface{}, 0, len(allSummaries))
 	for _, s := range allSummaries {
 		skillInfo := map[string]interface{}{
-			"id":                  s.ID,
-			"name":                s.Name,
-			"dir_name":            s.DirName,
-			"description":         s.Description,
-			"version":             s.Version,
-			"path":                s.Path,
-			"tags":                s.Tags,
-			"triggers":            s.Triggers,
-			"script_count":        s.ScriptCount,
-			"file_count":          s.FileCount,
-			"progressive": s.Progressive,
-			"file_size":   s.FileSize,
-			"mod_time":            s.ModTime,
+			"id":           s.ID,
+			"name":         s.Name,
+			"dir_name":     s.DirName,
+			"description":  s.Description,
+			"version":      s.Version,
+			"path":         s.Path,
+			"tags":         s.Tags,
+			"triggers":     s.Triggers,
+			"script_count": s.ScriptCount,
+			"file_count":   s.FileCount,
+			"progressive":  s.Progressive,
+			"file_size":    s.FileSize,
+			"mod_time":     s.ModTime,
 		}
 		allSkillsInfo = append(allSkillsInfo, skillInfo)
 	}

@@ -185,6 +185,7 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 	)
 
 	if runErr != nil {
+		h.persistEinoAgentTraceForResume(conversationID, result)
 		cause := context.Cause(baseCtx)
 		if errors.Is(cause, ErrTaskCancelled) {
 			taskStatus = "cancelled"
@@ -249,9 +250,9 @@ func (h *AgentHandler) MultiAgentLoopStream(c *gin.Context) {
 		)
 	}
 
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-			h.logger.Warn("保存 ReAct 数据失败", zap.Error(err))
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+			h.logger.Warn("保存代理轨迹失败", zap.Error(err))
 		}
 	}
 
@@ -318,6 +319,7 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		strings.TrimSpace(req.Orchestration),
 	)
 	if runErr != nil {
+		h.persistEinoAgentTraceForResume(prep.ConversationID, result)
 		h.logger.Error("Eino DeepAgent 执行失败", zap.Error(runErr))
 		errMsg := "执行失败: " + runErr.Error()
 		if prep.AssistantMessageID != "" {
@@ -341,9 +343,9 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		)
 	}
 
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		if err := h.db.SaveReActData(prep.ConversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-			h.logger.Warn("保存 ReAct 数据失败", zap.Error(err))
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		if err := h.db.SaveAgentTrace(prep.ConversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+			h.logger.Warn("保存代理轨迹失败", zap.Error(err))
 		}
 	}
 
@@ -353,6 +355,19 @@ func (h *AgentHandler) MultiAgentLoop(c *gin.Context) {
 		ConversationID:  prep.ConversationID,
 		Time:            time.Now(),
 	})
+}
+
+// persistEinoAgentTraceForResume 在 Eino 运行异常结束时写入代理轨迹（库列 last_react_*），供下一请求 loadHistoryFromAgentTrace 软续跑。
+func (h *AgentHandler) persistEinoAgentTraceForResume(conversationID string, result *multiagent.RunResult) {
+	if h == nil || result == nil {
+		return
+	}
+	if result.LastAgentTraceInput == "" && result.LastAgentTraceOutput == "" {
+		return
+	}
+	if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+		h.logger.Warn("保存 Eino 续跑上下文失败", zap.String("conversationId", conversationID), zap.Error(err))
+	}
 }
 
 func multiAgentHTTPErrorStatus(err error) (int, string) {

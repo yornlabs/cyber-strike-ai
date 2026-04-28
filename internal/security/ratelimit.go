@@ -16,10 +16,10 @@ type rateLimitEntry struct {
 
 // RateLimiter 基于 IP 的滑动窗口速率限制器
 type RateLimiter struct {
-	mu       sync.Mutex
-	entries  map[string]*rateLimitEntry
-	limit    int           // 窗口内允许的最大请求数
-	window   time.Duration // 窗口时长
+	mu      sync.Mutex
+	entries map[string]*rateLimitEntry
+	limit   int           // 窗口内允许的最大请求数
+	window  time.Duration // 窗口时长
 }
 
 // NewRateLimiter 创建速率限制器

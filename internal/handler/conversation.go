@@ -230,4 +230,3 @@ func (h *ConversationHandler) DeleteConversationTurn(c *gin.Context) {
 		"message":           "ok",
 	})
 }
-

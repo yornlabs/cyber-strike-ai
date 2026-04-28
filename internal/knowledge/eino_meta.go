@@ -16,9 +16,9 @@ const (
 
 // DSL keys for [VectorEinoRetriever.Retrieve] via [retriever.WithDSLInfo].
 const (
-	DSLRiskType             = "risk_type"
-	DSLSimilarityThreshold  = "similarity_threshold"
-	DSLSubIndexFilter       = "sub_index_filter"
+	DSLRiskType            = "risk_type"
+	DSLSimilarityThreshold = "similarity_threshold"
+	DSLSubIndexFilter      = "sub_index_filter"
 )
 
 // FormatEmbeddingInput matches the historical indexing format so existing embeddings

@@ -42,11 +42,11 @@ func (h *MonitorHandler) SetExternalMCPManager(mgr *mcp.ExternalMCPManager) {
 type MonitorResponse struct {
 	Executions []*mcp.ToolExecution      `json:"executions"`
 	Stats      map[string]*mcp.ToolStats `json:"stats"`
-	Timestamp  time.Time                  `json:"timestamp"`
-	Total      int                        `json:"total,omitempty"`
-	Page       int                        `json:"page,omitempty"`
-	PageSize   int                        `json:"page_size,omitempty"`
-	TotalPages int                        `json:"total_pages,omitempty"`
+	Timestamp  time.Time                 `json:"timestamp"`
+	Total      int                       `json:"total,omitempty"`
+	Page       int                       `json:"page,omitempty"`
+	PageSize   int                       `json:"page_size,omitempty"`
+	TotalPages int                       `json:"total_pages,omitempty"`
 }
 
 // Monitor 获取监控信息
@@ -212,7 +212,6 @@ func (h *MonitorHandler) loadStats() map[string]*mcp.ToolStats {
 
 	return stats
 }
-
 
 // GetExecution 获取特定执行记录
 func (h *MonitorHandler) GetExecution(c *gin.Context) {
@@ -416,5 +415,3 @@ func (h *MonitorHandler) DeleteExecutions(c *gin.Context) {
 	h.logger.Info("尝试批量删除内存中的执行记录", zap.Int("count", len(request.IDs)))
 	c.JSON(http.StatusOK, gin.H{"message": "执行记录已删除（如果存在）"})
 }
-
-

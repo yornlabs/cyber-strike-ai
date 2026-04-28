@@ -108,9 +108,9 @@ func (r *RetrievalLog) MarshalJSON() ([]byte, error) {
 
 // CategoryWithItems 分类及其下的知识项（用于按分类分页）
 type CategoryWithItems struct {
-	Category  string                `json:"category"`           // 分类名称
-	ItemCount int                   `json:"itemCount"`          // 该分类下的知识项总数
-	Items     []*KnowledgeItemSummary `json:"items"`            // 该分类下的知识项列表
+	Category  string                  `json:"category"`  // 分类名称
+	ItemCount int                     `json:"itemCount"` // 该分类下的知识项总数
+	Items     []*KnowledgeItemSummary `json:"items"`     // 该分类下的知识项列表
 }
 
 // SearchRequest 搜索请求

@@ -49,7 +49,7 @@ func (h *AgentHandler) prepareMultiAgentSession(req *ChatRequest) (*multiAgentPr
 		}
 	}
 
-	agentHistoryMessages, err := h.loadHistoryFromReActData(conversationID)
+	agentHistoryMessages, err := h.loadHistoryFromAgentTrace(conversationID)
 	if err != nil {
 		historyMessages, getErr := h.db.GetMessages(conversationID)
 		if getErr != nil {

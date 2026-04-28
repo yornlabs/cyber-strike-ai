@@ -83,7 +83,7 @@ func (h *AttackChainHandler) GetAttackChain(c *gin.Context) {
 	// 使用锁机制防止同一对话的并发生成
 	lockInterface, _ := h.generatingLocks.LoadOrStore(conversationID, &sync.Mutex{})
 	lock := lockInterface.(*sync.Mutex)
-	
+
 	// 尝试获取锁，如果正在生成则返回错误
 	acquired := lock.TryLock()
 	if !acquired {
@@ -144,7 +144,7 @@ func (h *AttackChainHandler) RegenerateAttackChain(c *gin.Context) {
 	// 使用锁机制防止并发生成
 	lockInterface, _ := h.generatingLocks.LoadOrStore(conversationID, &sync.Mutex{})
 	lock := lockInterface.(*sync.Mutex)
-	
+
 	acquired := lock.TryLock()
 	if !acquired {
 		h.logger.Info("攻击链正在生成中，请稍后再试", zap.String("conversationId", conversationID))
@@ -170,4 +170,3 @@ func (h *AttackChainHandler) RegenerateAttackChain(c *gin.Context) {
 
 	c.JSON(http.StatusOK, chain)
 }
-

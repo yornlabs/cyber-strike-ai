@@ -26,7 +26,7 @@ var apiDocI18nSummaryToKey = map[string]string{
 	"创建分组": "createGroup", "列出分组": "listGroups", "获取分组": "getGroup", "更新分组": "updateGroup",
 	"删除分组": "deleteGroup", "获取分组中的对话": "getGroupConversations", "添加对话到分组": "addConversationToGroup",
 	"从分组移除对话": "removeConversationFromGroup",
-	"列出漏洞": "listVulnerabilities", "创建漏洞": "createVulnerability", "获取漏洞统计": "getVulnerabilityStats",
+	"列出漏洞":    "listVulnerabilities", "创建漏洞": "createVulnerability", "获取漏洞统计": "getVulnerabilityStats",
 	"获取漏洞": "getVulnerability", "更新漏洞": "updateVulnerability", "删除漏洞": "deleteVulnerability",
 	"列出角色": "listRoles", "创建角色": "createRole", "获取角色": "getRole", "更新角色": "updateRole", "删除角色": "deleteRole",
 	"获取可用Skills列表": "getAvailableSkills", "列出Skills": "listSkills", "创建Skill": "createSkill",
@@ -52,9 +52,9 @@ var apiDocI18nSummaryToKey = map[string]string{
 	"重跑批量任务队列": "rerunBatchQueue", "修改队列元数据": "updateBatchQueueMetadata",
 	"修改队列调度配置": "updateBatchQueueSchedule", "开关Cron自动调度": "setBatchQueueScheduleEnabled",
 	"获取所有分组映射": "getAllGroupMappings",
-	"FOFA搜索": "fofaSearch", "自然语言解析为FOFA语法": "fofaParse",
+	"FOFA搜索":   "fofaSearch", "自然语言解析为FOFA语法": "fofaParse",
 	"测试OpenAI API连接": "testOpenAI",
-	"执行终端命令": "terminalRun", "流式执行终端命令": "terminalRunStream", "WebSocket终端": "terminalWS",
+	"执行终端命令":         "terminalRun", "流式执行终端命令": "terminalRunStream", "WebSocket终端": "terminalWS",
 	"列出WebShell连接": "listWebshellConnections", "创建WebShell连接": "createWebshellConnection",
 	"更新WebShell连接": "updateWebshellConnection", "删除WebShell连接": "deleteWebshellConnection",
 	"获取连接状态": "getWebshellConnectionState", "保存连接状态": "saveWebshellConnectionState",
@@ -69,7 +69,7 @@ var apiDocI18nSummaryToKey = map[string]string{
 	"获取Markdown代理详情": "getMarkdownAgent", "更新Markdown代理": "updateMarkdownAgent", "删除Markdown代理": "deleteMarkdownAgent",
 	"列出技能包文件": "listSkillPackageFiles", "获取技能包文件内容": "getSkillPackageFile", "写入技能包文件": "putSkillPackageFile",
 	"批量获取工具名称": "batchGetToolNames",
-	"获取知识库统计": "getKnowledgeStats",
+	"获取知识库统计":  "getKnowledgeStats",
 }
 
 var apiDocI18nResponseDescToKey = map[string]string{
@@ -78,7 +78,7 @@ var apiDocI18nResponseDescToKey = map[string]string{
 	"对话不存在或结果不存在": "conversationOrResultNotFound", "请求参数错误（如task为空）": "badRequestTaskEmpty",
 	"请求参数错误或分组名称已存在": "badRequestGroupNameExists", "分组不存在": "groupNotFound",
 	"请求参数错误（如配置格式不正确、缺少必需字段等）": "badRequestConfig",
-	"请求参数错误（如query为空）": "badRequestQueryEmpty", "方法不允许（仅支持POST请求）": "methodNotAllowed",
+	"请求参数错误（如query为空）":         "badRequestQueryEmpty", "方法不允许（仅支持POST请求）": "methodNotAllowed",
 	"登录成功": "loginSuccess", "密码错误": "invalidPassword", "登出成功": "logoutSuccess",
 	"密码修改成功": "passwordChanged", "Token有效": "tokenValid", "Token无效或已过期": "tokenInvalid",
 	"对话创建成功": "conversationCreated", "服务器内部错误": "internalError", "更新成功": "updateSuccess",
@@ -89,7 +89,7 @@ var apiDocI18nResponseDescToKey = map[string]string{
 	"消息发送成功，返回AI回复": "messageSent", "流式响应（Server-Sent Events）": "streamResponse",
 	// 新增缺失端点响应
 	"参数错误或删除失败": "badRequestOrDeleteFailed",
-	"参数错误": "paramError", "仅已完成或已取消的队列可以重跑": "onlyCompletedOrCancelledCanRerun",
+	"参数错误":      "paramError", "仅已完成或已取消的队列可以重跑": "onlyCompletedOrCancelledCanRerun",
 	"参数错误或队列正在运行中": "badRequestOrQueueRunning", "设置成功": "setSuccess",
 	"搜索成功": "searchSuccess", "解析成功": "parseSuccess", "测试结果": "testResult",
 	"执行完成": "executionDone", "SSE事件流": "sseEventStream", "WebSocket连接已建立": "wsEstablished",

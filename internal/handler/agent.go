@@ -497,10 +497,10 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		defer h.hitlManager.DeactivateConversation(conversationID)
 	}
 
-	// 优先尝试从保存的ReAct数据恢复历史上下文
-	agentHistoryMessages, err := h.loadHistoryFromReActData(conversationID)
+	// 优先尝试从保存的代理轨迹恢复历史上下文
+	agentHistoryMessages, err := h.loadHistoryFromAgentTrace(conversationID)
 	if err != nil {
-		h.logger.Warn("从ReAct数据加载历史消息失败，使用消息表", zap.Error(err))
+		h.logger.Warn("从代理轨迹加载历史消息失败，使用消息表", zap.Error(err))
 		// 回退到使用数据库消息表
 		historyMessages, err := h.db.GetMessages(conversationID)
 		if err != nil {
@@ -518,7 +518,7 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 			h.logger.Info("从消息表加载历史消息", zap.Int("count", len(agentHistoryMessages)))
 		}
 	} else {
-		h.logger.Info("从ReAct数据恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
+		h.logger.Info("从代理轨迹恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
 	}
 
 	// 校验附件数量（非流式）
@@ -613,12 +613,12 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 	if err != nil {
 		h.logger.Error("Agent Loop执行失败", zap.Error(err))
 
-		// 即使执行失败，也尝试保存ReAct数据（如果result中有）
-		if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
-			if saveErr := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); saveErr != nil {
-				h.logger.Warn("保存失败任务的ReAct数据失败", zap.Error(saveErr))
+		// 即使执行失败，也尝试保存代理轨迹（如果 result 中有）
+		if result != nil && (result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "") {
+			if saveErr := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); saveErr != nil {
+				h.logger.Warn("保存失败任务的代理轨迹失败", zap.Error(saveErr))
 			} else {
-				h.logger.Info("已保存失败任务的ReAct数据", zap.String("conversationId", conversationID))
+				h.logger.Info("已保存失败任务的代理轨迹", zap.String("conversationId", conversationID))
 			}
 		}
 
@@ -634,12 +634,12 @@ func (h *AgentHandler) AgentLoop(c *gin.Context) {
 		// 因为AI已经生成了回复，用户应该能看到
 	}
 
-	// 保存最后一轮ReAct的输入和输出
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-			h.logger.Warn("保存ReAct数据失败", zap.Error(err))
+	// 保存最后一轮代理轨迹与助手输出
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+			h.logger.Warn("保存代理轨迹失败", zap.Error(err))
 		} else {
-			h.logger.Info("已保存ReAct数据", zap.String("conversationId", conversationID))
+			h.logger.Info("已保存代理轨迹", zap.String("conversationId", conversationID))
 		}
 	}
 
@@ -666,7 +666,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 		}
 	}
 
-	agentHistoryMessages, err := h.loadHistoryFromReActData(conversationID)
+	agentHistoryMessages, err := h.loadHistoryFromAgentTrace(conversationID)
 	if err != nil {
 		historyMessages, getErr := h.db.GetMessages(conversationID)
 		if getErr != nil {
@@ -722,6 +722,7 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 			"deep",
 		)
 		if errMA != nil {
+			h.persistEinoAgentTraceForResume(conversationID, resultMA)
 			errMsg := "执行失败: " + errMA.Error()
 			if assistantMessageID != "" {
 				_, _ = h.db.Exec("UPDATE messages SET content = ? WHERE id = ?", errMsg, assistantMessageID)
@@ -747,8 +748,8 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 				h.logger.Warn("机器人：保存助手消息失败", zap.Error(err))
 			}
 		}
-		if resultMA.LastReActInput != "" || resultMA.LastReActOutput != "" {
-			_ = h.db.SaveReActData(conversationID, resultMA.LastReActInput, resultMA.LastReActOutput)
+		if resultMA.LastAgentTraceInput != "" || resultMA.LastAgentTraceOutput != "" {
+			_ = h.db.SaveAgentTrace(conversationID, resultMA.LastAgentTraceInput, resultMA.LastAgentTraceOutput)
 		}
 		return resultMA.Response, conversationID, nil
 	}
@@ -782,8 +783,8 @@ func (h *AgentHandler) ProcessMessageForRobot(ctx context.Context, conversationI
 			h.logger.Warn("机器人：保存助手消息失败", zap.Error(err))
 		}
 	}
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		_ = h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput)
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		_ = h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput)
 	}
 	return result.Response, conversationID, nil
 }
@@ -1359,10 +1360,10 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 	}
 	ssePublishConversationID = conversationID
 
-	// 优先尝试从保存的ReAct数据恢复历史上下文
-	agentHistoryMessages, err := h.loadHistoryFromReActData(conversationID)
+	// 优先尝试从保存的代理轨迹恢复历史上下文
+	agentHistoryMessages, err := h.loadHistoryFromAgentTrace(conversationID)
 	if err != nil {
-		h.logger.Warn("从ReAct数据加载历史消息失败，使用消息表", zap.Error(err))
+		h.logger.Warn("从代理轨迹加载历史消息失败，使用消息表", zap.Error(err))
 		// 回退到使用数据库消息表
 		historyMessages, err := h.db.GetMessages(conversationID)
 		if err != nil {
@@ -1380,7 +1381,7 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 			h.logger.Info("从消息表加载历史消息", zap.Int("count", len(agentHistoryMessages)))
 		}
 	} else {
-		h.logger.Info("从ReAct数据恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
+		h.logger.Info("从代理轨迹恢复历史上下文", zap.Int("count", len(agentHistoryMessages)))
 	}
 
 	// 校验附件数量
@@ -1579,12 +1580,12 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				h.db.AddProcessDetail(assistantMessageID, conversationID, "cancelled", cancelMsg, nil)
 			}
 
-			// 即使任务被取消，也尝试保存ReAct数据（如果result中有）
-			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
-				if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-					h.logger.Warn("保存取消任务的ReAct数据失败", zap.Error(err))
+			// 即使任务被取消，也尝试保存代理轨迹（如果 result 中有）
+			if result != nil && (result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "") {
+				if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+					h.logger.Warn("保存取消任务的代理轨迹失败", zap.Error(err))
 				} else {
-					h.logger.Info("已保存取消任务的ReAct数据", zap.String("conversationId", conversationID))
+					h.logger.Info("已保存取消任务的代理轨迹", zap.String("conversationId", conversationID))
 				}
 			}
 
@@ -1614,12 +1615,12 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				h.db.AddProcessDetail(assistantMessageID, conversationID, "timeout", timeoutMsg, nil)
 			}
 
-			// 即使任务超时，也尝试保存ReAct数据（如果result中有）
-			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
-				if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-					h.logger.Warn("保存超时任务的ReAct数据失败", zap.Error(err))
+			// 即使任务超时，也尝试保存代理轨迹（如果 result 中有）
+			if result != nil && (result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "") {
+				if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+					h.logger.Warn("保存超时任务的代理轨迹失败", zap.Error(err))
 				} else {
-					h.logger.Info("已保存超时任务的ReAct数据", zap.String("conversationId", conversationID))
+					h.logger.Info("已保存超时任务的代理轨迹", zap.String("conversationId", conversationID))
 				}
 			}
 
@@ -1649,12 +1650,12 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 				h.db.AddProcessDetail(assistantMessageID, conversationID, "error", errorMsg, nil)
 			}
 
-			// 即使任务失败，也尝试保存ReAct数据（如果result中有）
-			if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
-				if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-					h.logger.Warn("保存失败任务的ReAct数据失败", zap.Error(err))
+			// 即使任务失败，也尝试保存代理轨迹（如果 result 中有）
+			if result != nil && (result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "") {
+				if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+					h.logger.Warn("保存失败任务的代理轨迹失败", zap.Error(err))
 				} else {
-					h.logger.Info("已保存失败任务的ReAct数据", zap.String("conversationId", conversationID))
+					h.logger.Info("已保存失败任务的代理轨迹", zap.String("conversationId", conversationID))
 				}
 			}
 
@@ -1694,12 +1695,12 @@ func (h *AgentHandler) AgentLoopStream(c *gin.Context) {
 		}
 	}
 
-	// 保存最后一轮ReAct的输入和输出
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-			h.logger.Warn("保存ReAct数据失败", zap.Error(err))
+	// 保存最后一轮代理轨迹与助手输出
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+			h.logger.Warn("保存代理轨迹失败", zap.Error(err))
 		} else {
-			h.logger.Info("已保存ReAct数据", zap.String("conversationId", conversationID))
+			h.logger.Info("已保存代理轨迹", zap.String("conversationId", conversationID))
 		}
 	}
 
@@ -2499,6 +2500,9 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 		cancel()
 
 		if runErr != nil {
+			if useRunResult {
+				h.persistEinoAgentTraceForResume(conversationID, resultMA)
+			}
 			// 检查是否是取消错误
 			// 1. 直接检查是否是 context.Canceled（包括包装后的错误）
 			// 2. 检查错误消息中是否包含"context canceled"或"cancelled"关键字
@@ -2542,14 +2546,14 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 						h.logger.Warn("保存取消消息失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(errMsg))
 					}
 				}
-				// 保存ReAct数据（如果存在）
-				if result != nil && (result.LastReActInput != "" || result.LastReActOutput != "") {
-					if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-						h.logger.Warn("保存取消任务的ReAct数据失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+				// 保存代理轨迹（如果存在）
+				if result != nil && (result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "") {
+					if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+						h.logger.Warn("保存取消任务的代理轨迹失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
 					}
-				} else if useRunResult && resultMA != nil && (resultMA.LastReActInput != "" || resultMA.LastReActOutput != "") {
-					if err := h.db.SaveReActData(conversationID, resultMA.LastReActInput, resultMA.LastReActOutput); err != nil {
-						h.logger.Warn("保存取消任务的ReAct数据失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+				} else if useRunResult && resultMA != nil && (resultMA.LastAgentTraceInput != "" || resultMA.LastAgentTraceOutput != "") {
+					if err := h.db.SaveAgentTrace(conversationID, resultMA.LastAgentTraceInput, resultMA.LastAgentTraceOutput); err != nil {
+						h.logger.Warn("保存取消任务的代理轨迹失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
 					}
 				}
 				h.batchTaskManager.UpdateTaskStatusWithConversationID(queueID, task.ID, "cancelled", cancelMsg, "", conversationID)
@@ -2581,13 +2585,13 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 			if useRunResult {
 				resText = resultMA.Response
 				mcpIDs = resultMA.MCPExecutionIDs
-				lastIn = resultMA.LastReActInput
-				lastOut = resultMA.LastReActOutput
+				lastIn = resultMA.LastAgentTraceInput
+				lastOut = resultMA.LastAgentTraceOutput
 			} else {
 				resText = result.Response
 				mcpIDs = result.MCPExecutionIDs
-				lastIn = result.LastReActInput
-				lastOut = result.LastReActOutput
+				lastIn = result.LastAgentTraceInput
+				lastOut = result.LastAgentTraceOutput
 			}
 
 			// 更新助手消息内容
@@ -2618,12 +2622,12 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 				}
 			}
 
-			// 保存ReAct数据
+			// 保存代理轨迹
 			if lastIn != "" || lastOut != "" {
-				if err := h.db.SaveReActData(conversationID, lastIn, lastOut); err != nil {
-					h.logger.Warn("保存ReAct数据失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
+				if err := h.db.SaveAgentTrace(conversationID, lastIn, lastOut); err != nil {
+					h.logger.Warn("保存代理轨迹失败", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.Error(err))
 				} else {
-					h.logger.Info("已保存ReAct数据", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
+					h.logger.Info("已保存代理轨迹", zap.String("queueId", queueID), zap.String("taskId", task.ID), zap.String("conversationId", conversationID))
 				}
 			}
 
@@ -2642,36 +2646,33 @@ func (h *AgentHandler) executeBatchQueue(queueID string) {
 	}
 }
 
-// loadHistoryFromReActData 从保存的ReAct数据恢复历史消息上下文
-// 采用与攻击链生成类似的拼接逻辑：优先使用保存的last_react_input和last_react_output，若不存在则回退到消息表
-func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.ChatMessage, error) {
-	// 获取保存的ReAct输入和输出
-	reactInputJSON, reactOutput, err := h.db.GetReActData(conversationID)
+// loadHistoryFromAgentTrace 从库中保存的代理消息轨迹恢复历史（列 last_react_*；含单代理与 Eino）。
+// 逻辑与攻击链一致：优先用已保存的 JSON 消息带 + 最后一轮助手摘要，否则回退消息表。
+func (h *AgentHandler) loadHistoryFromAgentTrace(conversationID string) ([]agent.ChatMessage, error) {
+	traceInputJSON, assistantOut, err := h.db.GetAgentTrace(conversationID)
 	if err != nil {
-		return nil, fmt.Errorf("获取ReAct数据失败: %w", err)
+		return nil, fmt.Errorf("获取代理轨迹失败: %w", err)
 	}
 
-	// 如果last_react_input为空，回退到使用消息表（与攻击链生成逻辑一致）
-	if reactInputJSON == "" {
-		return nil, fmt.Errorf("ReAct数据为空，将使用消息表")
+	if traceInputJSON == "" {
+		return nil, fmt.Errorf("代理轨迹为空，将使用消息表")
 	}
 
-	dataSource := "database_last_react_input"
+	dataSource := "database_last_agent_trace"
 
-	// 解析JSON格式的messages数组
 	var messagesArray []map[string]interface{}
-	if err := json.Unmarshal([]byte(reactInputJSON), &messagesArray); err != nil {
-		return nil, fmt.Errorf("解析ReAct输入JSON失败: %w", err)
+	if err := json.Unmarshal([]byte(traceInputJSON), &messagesArray); err != nil {
+		return nil, fmt.Errorf("解析代理轨迹 JSON 失败: %w", err)
 	}
 
 	messageCount := len(messagesArray)
 
-	h.logger.Info("使用保存的ReAct数据恢复历史上下文",
+	h.logger.Info("使用保存的代理轨迹恢复历史上下文",
 		zap.String("conversationId", conversationID),
 		zap.String("dataSource", dataSource),
-		zap.Int("reactInputSize", len(reactInputJSON)),
+		zap.Int("traceInputSize", len(traceInputJSON)),
 		zap.Int("messageCount", messageCount),
-		zap.Int("reactOutputSize", len(reactOutput)),
+		zap.Int("assistantOutSize", len(assistantOut)),
 	)
 	// fmt.Println("messagesArray:", messagesArray)//debug
 
@@ -2755,53 +2756,44 @@ func (h *AgentHandler) loadHistoryFromReActData(conversationID string) ([]agent.
 		agentMessages = append(agentMessages, msg)
 	}
 
-	// 如果存在last_react_output，需要将其作为最后一条assistant消息
-	// 因为last_react_input是在迭代开始前保存的，不包含最后一轮的最终输出
-	if reactOutput != "" {
-		// 检查最后一条消息是否是assistant消息且没有tool_calls
-		// 如果有tool_calls，说明后面应该还有tool消息和最终的assistant回复
+	// 若存在 last_react_output（助手摘要），合并为最后一条 assistant（与保存格式一致）
+	if assistantOut != "" {
 		if len(agentMessages) > 0 {
 			lastMsg := &agentMessages[len(agentMessages)-1]
 			if strings.EqualFold(lastMsg.Role, "assistant") && len(lastMsg.ToolCalls) == 0 {
-				// 最后一条是assistant消息且没有tool_calls，用最终输出更新其content
-				lastMsg.Content = reactOutput
+				lastMsg.Content = assistantOut
 			} else {
-				// 最后一条不是assistant消息，或者有tool_calls，添加最终输出作为新的assistant消息
 				agentMessages = append(agentMessages, agent.ChatMessage{
 					Role:    "assistant",
-					Content: reactOutput,
+					Content: assistantOut,
 				})
 			}
 		} else {
-			// 如果没有消息，直接添加最终输出
 			agentMessages = append(agentMessages, agent.ChatMessage{
 				Role:    "assistant",
-				Content: reactOutput,
+				Content: assistantOut,
 			})
 		}
 	}
 
 	if len(agentMessages) == 0 {
-		return nil, fmt.Errorf("从ReAct数据解析的消息为空")
+		return nil, fmt.Errorf("从代理轨迹解析的消息为空")
 	}
 
-	// 修复可能存在的失配tool消息，避免OpenAI报错
-	// 这可以防止出现"messages with role 'tool' must be a response to a preceeding message with 'tool_calls'"错误
 	if h.agent != nil {
 		if fixed := h.agent.RepairOrphanToolMessages(&agentMessages); fixed {
-			h.logger.Info("修复了从ReAct数据恢复的历史消息中的失配tool消息",
+			h.logger.Info("修复了从代理轨迹恢复的历史消息中的失配 tool 消息",
 				zap.String("conversationId", conversationID),
 			)
 		}
 	}
 
-	h.logger.Info("从ReAct数据恢复历史消息完成",
+	h.logger.Info("从代理轨迹恢复历史消息完成",
 		zap.String("conversationId", conversationID),
 		zap.String("dataSource", dataSource),
 		zap.Int("originalMessageCount", messageCount),
 		zap.Int("finalMessageCount", len(agentMessages)),
-		zap.Bool("hasReactOutput", reactOutput != ""),
+		zap.Bool("hasAssistantOut", assistantOut != ""),
 	)
-	fmt.Println("agentMessages:", agentMessages) //debug
 	return agentMessages, nil
 }

@@ -4445,7 +4445,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"messageId"},
 									"properties": map[string]interface{}{
 										"messageId": map[string]interface{}{
@@ -4689,7 +4689,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"scheduleEnabled"},
 									"properties": map[string]interface{}{
 										"scheduleEnabled": map[string]interface{}{"type": "boolean", "description": "是否启用自动调度"},
@@ -4761,7 +4761,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"query"},
 									"properties": map[string]interface{}{
 										"query":  map[string]interface{}{"type": "string", "description": "FOFA查询语法", "example": "domain=\"example.com\""},
@@ -4810,7 +4810,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"text"},
 									"properties": map[string]interface{}{
 										"text": map[string]interface{}{"type": "string", "description": "自然语言描述", "example": "查找使用WordPress的网站"},
@@ -4853,7 +4853,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"api_key", "model"},
 									"properties": map[string]interface{}{
 										"provider": map[string]interface{}{"type": "string", "description": "LLM提供商（openai/claude）", "example": "openai"},
@@ -4900,7 +4900,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"command"},
 									"properties": map[string]interface{}{
 										"command": map[string]interface{}{"type": "string", "description": "要执行的命令"},
@@ -4943,7 +4943,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"command"},
 									"properties": map[string]interface{}{
 										"command": map[string]interface{}{"type": "string", "description": "要执行的命令"},
@@ -5027,7 +5027,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"url"},
 									"properties": map[string]interface{}{
 										"url":       map[string]interface{}{"type": "string", "description": "WebShell URL"},
@@ -5231,7 +5231,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"url", "command"},
 									"properties": map[string]interface{}{
 										"url":       map[string]interface{}{"type": "string", "description": "WebShell URL"},
@@ -5277,7 +5277,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"url", "action", "path"},
 									"properties": map[string]interface{}{
 										"url":         map[string]interface{}{"type": "string", "description": "WebShell URL"},
@@ -5339,14 +5339,14 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 												"items": map[string]interface{}{
 													"type": "object",
 													"properties": map[string]interface{}{
-														"relativePath":  map[string]interface{}{"type": "string"},
-														"absolutePath":  map[string]interface{}{"type": "string"},
-														"name":          map[string]interface{}{"type": "string"},
-														"size":          map[string]interface{}{"type": "integer"},
-														"modifiedUnix":  map[string]interface{}{"type": "integer"},
-														"date":          map[string]interface{}{"type": "string"},
+														"relativePath":   map[string]interface{}{"type": "string"},
+														"absolutePath":   map[string]interface{}{"type": "string"},
+														"name":           map[string]interface{}{"type": "string"},
+														"size":           map[string]interface{}{"type": "integer"},
+														"modifiedUnix":   map[string]interface{}{"type": "integer"},
+														"date":           map[string]interface{}{"type": "string"},
 														"conversationId": map[string]interface{}{"type": "string"},
-														"subPath":       map[string]interface{}{"type": "string"},
+														"subPath":        map[string]interface{}{"type": "string"},
 													},
 												},
 											},
@@ -5369,7 +5369,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"multipart/form-data": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"file"},
 									"properties": map[string]interface{}{
 										"file":           map[string]interface{}{"type": "string", "format": "binary", "description": "上传的文件"},
@@ -5410,7 +5410,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"path"},
 									"properties": map[string]interface{}{
 										"path": map[string]interface{}{"type": "string", "description": "文件相对路径"},
@@ -5485,7 +5485,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"path", "content"},
 									"properties": map[string]interface{}{
 										"path":    map[string]interface{}{"type": "string", "description": "文件相对路径"},
@@ -5512,7 +5512,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"name"},
 									"properties": map[string]interface{}{
 										"parent": map[string]interface{}{"type": "string", "description": "父目录相对路径"},
@@ -5552,7 +5552,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"path", "newName"},
 									"properties": map[string]interface{}{
 										"path":    map[string]interface{}{"type": "string", "description": "当前文件相对路径"},
@@ -5646,7 +5646,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"platform", "text"},
 									"properties": map[string]interface{}{
 										"platform": map[string]interface{}{"type": "string", "description": "平台类型", "enum": []string{"dingtalk", "lark", "wecom"}},
@@ -5712,7 +5712,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"name"},
 									"properties": map[string]interface{}{
 										"filename":       map[string]interface{}{"type": "string", "description": "文件名（可选，自动生成）"},
@@ -5932,7 +5932,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"path"},
 									"properties": map[string]interface{}{
 										"path":    map[string]interface{}{"type": "string", "description": "文件相对路径"},
@@ -5974,7 +5974,7 @@ func (h *OpenAPIHandler) GetOpenAPISpec(c *gin.Context) {
 						"content": map[string]interface{}{
 							"application/json": map[string]interface{}{
 								"schema": map[string]interface{}{
-									"type": "object",
+									"type":     "object",
 									"required": []string{"ids"},
 									"properties": map[string]interface{}{
 										"ids": map[string]interface{}{

@@ -11,9 +11,9 @@ import (
 	"cyberstrike-ai/internal/config"
 
 	fileloader "github.com/cloudwego/eino-ext/components/document/loader/file"
-	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/components/document"
 	"github.com/cloudwego/eino/components/indexer"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 	"go.uber.org/zap"
 )
@@ -35,14 +35,14 @@ type Indexer struct {
 	lastErrorTime time.Time
 	errorCount    int
 
-	rebuildMu          sync.RWMutex
-	isRebuilding       bool
-	rebuildTotalItems  int
-	rebuildCurrent     int
-	rebuildFailed      int
-	rebuildStartTime   time.Time
-	rebuildLastItemID  string
-	rebuildLastChunks  int
+	rebuildMu         sync.RWMutex
+	isRebuilding      bool
+	rebuildTotalItems int
+	rebuildCurrent    int
+	rebuildFailed     int
+	rebuildStartTime  time.Time
+	rebuildLastItemID string
+	rebuildLastChunks int
 }
 
 // NewIndexer 创建索引器并编译 Eino 索引链；kcfg 为完整知识库配置（含 indexing 与路径相关行为）。

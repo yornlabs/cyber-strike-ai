@@ -175,6 +175,7 @@ func (h *AgentHandler) EinoSingleAgentLoopStream(c *gin.Context) {
 	)
 
 	if runErr != nil {
+		h.persistEinoAgentTraceForResume(conversationID, result)
 		cause := context.Cause(baseCtx)
 		if errors.Is(cause, ErrTaskCancelled) {
 			taskStatus = "cancelled"
@@ -239,9 +240,9 @@ func (h *AgentHandler) EinoSingleAgentLoopStream(c *gin.Context) {
 		)
 	}
 
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		if err := h.db.SaveReActData(conversationID, result.LastReActInput, result.LastReActOutput); err != nil {
-			h.logger.Warn("保存 ReAct 数据失败", zap.Error(err))
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		if err := h.db.SaveAgentTrace(conversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput); err != nil {
+			h.logger.Warn("保存代理轨迹失败", zap.Error(err))
 		}
 	}
 
@@ -306,6 +307,7 @@ func (h *AgentHandler) EinoSingleAgentLoop(c *gin.Context) {
 		progressCallback,
 	)
 	if runErr != nil {
+		h.persistEinoAgentTraceForResume(prep.ConversationID, result)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": runErr.Error()})
 		return
 	}
@@ -323,8 +325,8 @@ func (h *AgentHandler) EinoSingleAgentLoop(c *gin.Context) {
 			prep.AssistantMessageID,
 		)
 	}
-	if result.LastReActInput != "" || result.LastReActOutput != "" {
-		_ = h.db.SaveReActData(prep.ConversationID, result.LastReActInput, result.LastReActOutput)
+	if result.LastAgentTraceInput != "" || result.LastAgentTraceOutput != "" {
+		_ = h.db.SaveAgentTrace(prep.ConversationID, result.LastAgentTraceInput, result.LastAgentTraceOutput)
 	}
 
 	c.JSON(http.StatusOK, gin.H{

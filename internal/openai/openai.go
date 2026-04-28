@@ -281,9 +281,9 @@ func (c *Client) ChatCompletionStream(ctx context.Context, payload interface{}, 
 
 // StreamToolCall 流式工具调用的累积结果（arguments 以字符串形式拼接，留给上层再解析为 JSON）。
 type StreamToolCall struct {
-	Index            int
-	ID               string
-	Type             string
+	Index           int
+	ID              string
+	Type            string
 	FunctionName    string
 	FunctionArgsStr string
 }
@@ -348,10 +348,10 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 		Arguments string `json:"arguments,omitempty"`
 	}
 	type toolCallDelta struct {
-		Index    int                     `json:"index,omitempty"`
-		ID       string                  `json:"id,omitempty"`
-		Type     string                  `json:"type,omitempty"`
-		Function toolCallFunctionDelta  `json:"function,omitempty"`
+		Index    int                   `json:"index,omitempty"`
+		ID       string                `json:"id,omitempty"`
+		Type     string                `json:"type,omitempty"`
+		Function toolCallFunctionDelta `json:"function,omitempty"`
 	}
 	type streamDelta2 struct {
 		Content   string          `json:"content,omitempty"`
@@ -371,10 +371,10 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 	}
 
 	type toolCallAccum struct {
-		id    string
-		typ   string
-		name  string
-		args  strings.Builder
+		id   string
+		typ  string
+		name string
+		args strings.Builder
 	}
 	toolCallAccums := make(map[int]*toolCallAccum)
 
@@ -475,9 +475,9 @@ func (c *Client) ChatCompletionStreamWithToolCalls(
 	for _, idx := range indices {
 		acc := toolCallAccums[idx]
 		tc := StreamToolCall{
-			Index:            idx,
-			ID:               acc.id,
-			Type:             acc.typ,
+			Index:           idx,
+			ID:              acc.id,
+			Type:            acc.typ,
 			FunctionName:    acc.name,
 			FunctionArgsStr: acc.args.String(),
 		}

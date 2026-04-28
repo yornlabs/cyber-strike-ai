@@ -192,13 +192,13 @@ func convertOpenAIToClaude(payload interface{}) (*claudeRequest, error) {
 					fnName, _ := fn["name"].(string)
 					fnArgs, _ := fn["arguments"]
 
-						// 防御：缺少 name 或 id 的 tool_call 会被 Claude 拒绝
-						if strings.TrimSpace(fnName) == "" {
-							fnName = "unknown_function"
-						}
-						if strings.TrimSpace(tcID) == "" {
-							tcID = fmt.Sprintf("call_%d", time.Now().UnixNano())
-						}
+					// 防御：缺少 name 或 id 的 tool_call 会被 Claude 拒绝
+					if strings.TrimSpace(fnName) == "" {
+						fnName = "unknown_function"
+					}
+					if strings.TrimSpace(tcID) == "" {
+						tcID = fmt.Sprintf("call_%d", time.Now().UnixNano())
+					}
 
 					var inputRaw json.RawMessage
 					switch v := fnArgs.(type) {

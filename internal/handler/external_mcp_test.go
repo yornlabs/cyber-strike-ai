@@ -247,7 +247,7 @@ func TestExternalMCPHandler_DeleteExternalMCP(t *testing.T) {
 
 	// 先添加一个配置
 	configObj := config.ExternalMCPServerConfig{
-		Command: "python3",
+		Command:           "python3",
 		ExternalMCPEnable: true,
 	}
 	handler.manager.AddOrUpdateConfig("test-delete", configObj)
@@ -276,11 +276,11 @@ func TestExternalMCPHandler_GetExternalMCPs(t *testing.T) {
 
 	// 添加多个配置
 	handler.manager.AddOrUpdateConfig("test1", config.ExternalMCPServerConfig{
-		Command: "python3",
+		Command:           "python3",
 		ExternalMCPEnable: true,
 	})
 	handler.manager.AddOrUpdateConfig("test2", config.ExternalMCPServerConfig{
-		URL:     "http://127.0.0.1:8081/mcp",
+		URL:               "http://127.0.0.1:8081/mcp",
 		ExternalMCPEnable: false,
 	})
 
@@ -319,15 +319,15 @@ func TestExternalMCPHandler_GetExternalMCPStats(t *testing.T) {
 
 	// 添加配置
 	handler.manager.AddOrUpdateConfig("enabled1", config.ExternalMCPServerConfig{
-		Command: "python3",
+		Command:           "python3",
 		ExternalMCPEnable: true,
 	})
 	handler.manager.AddOrUpdateConfig("enabled2", config.ExternalMCPServerConfig{
-		URL:     "http://127.0.0.1:8081/mcp",
+		URL:               "http://127.0.0.1:8081/mcp",
 		ExternalMCPEnable: true,
 	})
 	handler.manager.AddOrUpdateConfig("disabled1", config.ExternalMCPServerConfig{
-		Command:  "python3",
+		Command: "python3",
 	})
 
 	req := httptest.NewRequest("GET", "/api/external-mcp/stats", nil)
@@ -360,7 +360,7 @@ func TestExternalMCPHandler_StartStopExternalMCP(t *testing.T) {
 
 	// 添加一个禁用的配置
 	handler.manager.AddOrUpdateConfig("test-start-stop", config.ExternalMCPServerConfig{
-		Command:  "python3",
+		Command: "python3",
 	})
 
 	// 测试启动（可能会失败，因为没有真实的服务器）
@@ -416,7 +416,7 @@ func TestExternalMCPHandler_AddOrUpdateExternalMCP_EmptyName(t *testing.T) {
 	router, _, _ := setupTestRouter()
 
 	configObj := config.ExternalMCPServerConfig{
-		Command: "python3",
+		Command:           "python3",
 		ExternalMCPEnable: true,
 	}
 
@@ -459,14 +459,14 @@ func TestExternalMCPHandler_UpdateExistingConfig(t *testing.T) {
 
 	// 先添加配置
 	config1 := config.ExternalMCPServerConfig{
-		Command: "python3",
+		Command:           "python3",
 		ExternalMCPEnable: true,
 	}
 	handler.manager.AddOrUpdateConfig("test-update", config1)
 
 	// 更新配置
 	config2 := config.ExternalMCPServerConfig{
-		URL:     "http://127.0.0.1:8081/mcp",
+		URL:               "http://127.0.0.1:8081/mcp",
 		ExternalMCPEnable: true,
 	}
 
