@@ -168,11 +168,29 @@ func RunEinoSingleChatModelAgent(
 		},
 		EmitInternalEvents: true,
 	}
+	ins := injectToolNamesOnlyInstruction(ctx, ag.EinoSingleAgentSystemInstruction(), mainTools)
+	if logger != nil {
+		names := collectToolNames(ctx, mainTools)
+		mountedNames := collectToolNames(ctx, mainToolsForCfg)
+		hasToolSearch := false
+		for _, n := range names {
+			if strings.EqualFold(strings.TrimSpace(n), "tool_search") {
+				hasToolSearch = true
+				break
+			}
+		}
+		logger.Info("eino tool-name injection",
+			zap.String("scope", "eino_single"),
+			zap.Int("tool_names", len(names)),
+			zap.Int("mounted_tool_names", len(mountedNames)),
+			zap.Bool("has_tool_search", hasToolSearch),
+		)
+	}
 
 	chatCfg := &adk.ChatModelAgentConfig{
 		Name:          einoSingleAgentName,
 		Description:   "Eino ADK ChatModelAgent with MCP tools for authorized security testing.",
-		Instruction:   ag.EinoSingleAgentSystemInstruction(),
+		Instruction:   ins,
 		Model:         mainModel,
 		ToolsConfig:   mainToolsCfg,
 		MaxIterations: maxIter,

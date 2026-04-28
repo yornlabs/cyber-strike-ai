@@ -261,10 +261,29 @@ func RunDeepAgent(
 				subHandlers = append(subHandlers, teleMw)
 			}
 
+			subInstrFinal := injectToolNamesOnlyInstruction(ctx, instr, subTools)
+			if logger != nil {
+				subNames := collectToolNames(ctx, subTools)
+				mountedNames := collectToolNames(ctx, subToolsForCfg)
+				hasToolSearch := false
+				for _, n := range subNames {
+					if strings.EqualFold(strings.TrimSpace(n), "tool_search") {
+						hasToolSearch = true
+						break
+					}
+				}
+				logger.Info("eino tool-name injection",
+					zap.String("scope", "sub_agent"),
+					zap.String("agent", id),
+					zap.Int("tool_names", len(subNames)),
+					zap.Int("mounted_tool_names", len(mountedNames)),
+					zap.Bool("has_tool_search", hasToolSearch),
+				)
+			}
 			sa, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 				Name:        id,
 				Description: desc,
-				Instruction: instr,
+				Instruction: subInstrFinal,
 				Model:       subModel,
 				ToolsConfig: adk.ToolsConfig{
 					ToolsNodeConfig: compose.ToolsNodeConfig{
@@ -315,6 +334,25 @@ func RunDeepAgent(
 		if d := strings.TrimSpace(orch.Description); d != "" {
 			orchDescription = d
 		}
+	}
+	orchInstruction = injectToolNamesOnlyInstruction(ctx, orchInstruction, mainTools)
+	if logger != nil {
+		mainNames := collectToolNames(ctx, mainTools)
+		mountedNames := collectToolNames(ctx, mainToolsForCfg)
+		hasToolSearch := false
+		for _, n := range mainNames {
+			if strings.EqualFold(strings.TrimSpace(n), "tool_search") {
+				hasToolSearch = true
+				break
+			}
+		}
+		logger.Info("eino tool-name injection",
+			zap.String("scope", "orchestrator"),
+			zap.String("orchestration", orchMode),
+			zap.Int("tool_names", len(mainNames)),
+			zap.Int("mounted_tool_names", len(mountedNames)),
+			zap.Bool("has_tool_search", hasToolSearch),
+		)
 	}
 
 	supInstr := strings.TrimSpace(orchInstruction)
