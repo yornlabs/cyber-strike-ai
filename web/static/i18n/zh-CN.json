@@ -33,6 +33,13 @@
     "version": "当前版本",
     "toggleSidebar": "折叠/展开侧边栏"
   },
+  "notifications": {
+    "title": "事件通知",
+    "empty": "暂无新事件",
+    "markAllRead": "标记已读",
+    "markSingleRead": "已读",
+    "itemDefaultTitle": "通知"
+  },
   "login": {
     "title": "登录 CyberStrikeAI",
     "subtitle": "请输入配置中的访问密码",
@@ -239,7 +246,20 @@
   },
   "hitl": {
     "pageTitle": "人机协同审批",
-    "pendingTitle": "待处理审批"
+    "pendingTitle": "待处理审批",
+    "loading": "加载中...",
+    "emptyState": "暂无待审批项",
+    "dismiss": "忽略",
+    "conversationLabel": "会话：",
+    "reviewEditHelp": "审查编辑模式：可填写 JSON 对象覆盖参数。示例：{\"command\":\"ls -la\"}",
+    "approvalHelp": "审批模式：仅通过/拒绝，不支持改参。",
+    "commentHelp": "备注（可选）：建议写审批依据。",
+    "commentPlaceholder": "例如：允许只读命令",
+    "reject": "拒绝",
+    "approve": "通过",
+    "loadFailed": "加载失败",
+    "invalidJson": "JSON 参数格式错误",
+    "submitFailedPrefix": "提交失败："
   },
   "progress": {
     "callingAI": "正在调用AI模型...",

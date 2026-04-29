@@ -33,6 +33,13 @@
     "version": "Current version",
     "toggleSidebar": "Collapse/expand sidebar"
   },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No new events",
+    "markAllRead": "Mark all read",
+    "markSingleRead": "Read",
+    "itemDefaultTitle": "Notification"
+  },
   "login": {
     "title": "Sign in to CyberStrikeAI",
     "subtitle": "Enter the access password from config",
@@ -239,7 +246,20 @@
   },
   "hitl": {
     "pageTitle": "HITL approvals",
-    "pendingTitle": "Pending approvals"
+    "pendingTitle": "Pending approvals",
+    "loading": "Loading...",
+    "emptyState": "No pending approvals",
+    "dismiss": "Dismiss",
+    "conversationLabel": "Conversation:",
+    "reviewEditHelp": "Review & edit mode: provide a JSON object to override tool arguments. Example: {\"command\":\"ls -la\"}",
+    "approvalHelp": "Approval mode: only approve/reject, argument editing is disabled.",
+    "commentHelp": "Comment (optional): briefly note the approval reason.",
+    "commentPlaceholder": "e.g. allow read-only command",
+    "reject": "Reject",
+    "approve": "Approve",
+    "loadFailed": "Failed to load",
+    "invalidJson": "Invalid JSON arguments",
+    "submitFailedPrefix": "Submit failed:"
   },
   "progress": {
     "callingAI": "Calling AI model...",

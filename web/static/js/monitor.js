@@ -2348,9 +2348,28 @@ function renderActiveTasks(tasks) {
     bar.style.display = 'flex';
     bar.innerHTML = '';
 
+    function openActiveTaskConversation(conversationId) {
+        if (!conversationId) return;
+        if (typeof switchPage === 'function') {
+            switchPage('chat');
+        }
+        if (typeof window.loadConversation === 'function') {
+            setTimeout(function () {
+                window.loadConversation(conversationId);
+            }, 120);
+            return;
+        }
+        window.location.hash = 'chat?conversation=' + encodeURIComponent(conversationId);
+    }
+
     normalizedTasks.forEach(task => {
         const item = document.createElement('div');
-        item.className = 'active-task-item';
+        item.className = 'active-task-item active-task-item-clickable';
+        if (task && task.conversationId) {
+            item.title = (typeof window.t === 'function' ? window.t('tasks.viewConversation') : '查看会话');
+            item.setAttribute('role', 'button');
+            item.onclick = () => openActiveTaskConversation(task.conversationId);
+        }
 
         const startedTime = task.startedAt ? new Date(task.startedAt) : null;
         const taskTimeLocale = getCurrentTimeLocale();
@@ -2388,7 +2407,10 @@ function renderActiveTasks(tasks) {
         if (!isFinalStatus) {
             const cancelBtn = item.querySelector('.active-task-cancel');
             if (cancelBtn) {
-                cancelBtn.onclick = () => cancelActiveTask(task.conversationId, cancelBtn);
+                cancelBtn.onclick = (evt) => {
+                    evt.stopPropagation();
+                    cancelActiveTask(task.conversationId, cancelBtn);
+                };
                 if (task.status === 'cancelling') {
                     cancelBtn.disabled = true;
                     cancelBtn.textContent = typeof window.t === 'function' ? window.t('tasks.cancelling') : '取消中...';
